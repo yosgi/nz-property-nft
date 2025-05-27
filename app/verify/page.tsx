@@ -201,31 +201,28 @@ export default function VerifyPage() {
         const pendingValuation = await valuationContract.pendingValuations(i)
         const hasPendingValuation = pendingValuation && pendingValuation.estimatedValue > 0
 
-        // Only show unverified properties or properties with pending valuations
-        if (!isVerified || hasPendingValuation) {
-          propertiesData.push({
-            id: i.toString(),
-            address: propertyData.propertyAddress,
-            ownerName: propertyData.ownerName,
-            propertyType: propertyData.propertyType,
-            image: convertIPFStoHTTP(tokenURI),
-            submittedDate: formattedDate,
+        propertiesData.push({
+          id: i.toString(),
+          address: propertyData.propertyAddress,
+          ownerName: propertyData.ownerName,
+          propertyType: propertyData.propertyType,
+          image: convertIPFStoHTTP(tokenURI),
+          submittedDate: formattedDate,
+          votes: {
+            approve: Number(propertyData.verificationVotes) || 0,
+            reject: Number(propertyData.rejectionVotes) || 0
+          },
+          isVerified,
+          estimatedValue: propertyData.estimatedValue,
+          isValuationUpdate: hasPendingValuation,
+          pendingValuation: hasPendingValuation ? {
+            value: pendingValuation.estimatedValue,
             votes: {
-              approve: Number(propertyData.approvalVotes) || 0,
-              reject: Number(propertyData.rejectionVotes) || 0
-            },
-            isVerified,
-            estimatedValue: propertyData.estimatedValue,
-            isValuationUpdate: hasPendingValuation,
-            pendingValuation: hasPendingValuation ? {
-              value: pendingValuation.estimatedValue,
-              votes: {
-                approve: Number(pendingValuation.verificationVotes) || 0,
-                reject: Number(pendingValuation.rejectionVotes) || 0
-              }
-            } : undefined
-          })
-        }
+              approve: Number(pendingValuation.verificationVotes) || 0,
+              reject: Number(pendingValuation.rejectionVotes) || 0
+            }
+          } : undefined
+        })
       }
 
       setProperties(propertiesData)
@@ -347,39 +344,41 @@ export default function VerifyPage() {
         </TabsList>
 
         <TabsContent value="pending" className="mt-6">
-          {properties.length === 0 ? (
+          {properties.filter(p => !p.isVerified && !p.isValuationUpdate).length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No properties pending verification</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {properties.map((property) => (
-                <Card key={property.id} className="relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {properties.filter(p => !p.isVerified && !p.isValuationUpdate).map((property) => (
+                <Card key={property.id} className="relative overflow-hidden">
                   {property.isValuationUpdate && (
-                    <Badge className="absolute top-2 right-2 bg-yellow-500">Valuation Update</Badge>
+                    <Badge className="absolute top-2 right-2 bg-yellow-500 hover:bg-yellow-600">Valuation Update</Badge>
                   )}
-                  <CardHeader>
-                    <CardTitle className="line-clamp-1">{property.address}</CardTitle>
-                    <CardDescription>
-                      Submitted by {property.ownerName} on {property.submittedDate}
+                  <CardHeader className="pb-2">
+                    <CardTitle className="line-clamp-1 text-lg">{property.address}</CardTitle>
+                    <CardDescription className="flex items-center gap-2">
+                      <span>By {property.ownerName}</span>
+                      <span>•</span>
+                      <span>{property.submittedDate}</span>
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="relative w-[200px] h-[200px] mx-auto mb-4">
+                    <div className="relative w-full aspect-square mb-4 rounded-lg overflow-hidden bg-muted">
                       <img
                         src={property.image}
                         alt={property.address}
-                        className="object-cover w-full h-full rounded-lg"
+                        className="object-cover w-full h-full"
                         onError={(e) => {
                           console.log("Image failed to load:", property.image)
-                          e.currentTarget.src = "/placeholder.svg?height=200&width=200"
+                          e.currentTarget.src = "/placeholder.svg?height=400&width=400"
                         }}
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Property Type</span>
-                        <Badge variant="outline">{property.propertyType}</Badge>
+                        <Badge variant="secondary">{property.propertyType}</Badge>
                       </div>
                       {property.isValuationUpdate && (
                         <div className="flex justify-between items-center">
@@ -392,21 +391,21 @@ export default function VerifyPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Votes</span>
                         <div className="flex gap-2">
-                          <Badge variant="outline" className="bg-green-100">
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                             Approve: {property.isValuationUpdate ? property.pendingValuation?.votes.approve : property.votes.approve}
                           </Badge>
-                          <Badge variant="outline" className="bg-red-100">
+                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
                             Reject: {property.isValuationUpdate ? property.pendingValuation?.votes.reject : property.votes.reject}
                           </Badge>
                         </div>
                       </div>
                     </div>
                   </CardContent>
-                  <CardFooter>
+                  <CardFooter className="pt-2">
                     <div className="flex gap-2 w-full">
                       <Button
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 hover:bg-red-50 hover:text-red-700 hover:border-red-200"
                         onClick={() => submitVote(property.id, false)}
                         disabled={!walletConnected}
                       >
@@ -414,7 +413,7 @@ export default function VerifyPage() {
                         Reject
                       </Button>
                       <Button
-                        className="flex-1"
+                        className="flex-1 hover:bg-green-50 hover:text-green-700 hover:border-green-200"
                         onClick={() => submitVote(property.id, true)}
                         disabled={!walletConnected}
                       >
@@ -437,26 +436,28 @@ export default function VerifyPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {properties.filter(p => p.isValuationUpdate).map((property) => (
-                <Card key={property.id} className="relative">
-                  <CardHeader>
-                    <CardTitle className="line-clamp-1">{property.address}</CardTitle>
-                    <CardDescription>
-                      Valuation update by {property.ownerName}
+                <Card key={property.id} className="relative overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="line-clamp-1 text-lg">{property.address}</CardTitle>
+                    <CardDescription className="flex items-center gap-2">
+                      <span>By {property.ownerName}</span>
+                      <span>•</span>
+                      <span>{property.submittedDate}</span>
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="relative w-[200px] h-[200px] mx-auto mb-4">
+                    <div className="relative w-full aspect-square mb-4 rounded-lg overflow-hidden bg-muted">
                       <img
                         src={property.image}
                         alt={property.address}
-                        className="object-cover w-full h-full rounded-lg"
+                        className="object-cover w-full h-full"
                         onError={(e) => {
                           console.log("Image failed to load:", property.image)
-                          e.currentTarget.src = "/placeholder.svg?height=200&width=200"
+                          e.currentTarget.src = "/placeholder.svg?height=400&width=400"
                         }}
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Current Value</span>
                         <span className="text-sm font-semibold">
@@ -472,21 +473,21 @@ export default function VerifyPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Votes</span>
                         <div className="flex gap-2">
-                          <Badge variant="outline" className="bg-green-100">
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                             Approve: {property.pendingValuation?.votes.approve}
                           </Badge>
-                          <Badge variant="outline" className="bg-red-100">
+                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
                             Reject: {property.pendingValuation?.votes.reject}
                           </Badge>
                         </div>
                       </div>
                     </div>
                   </CardContent>
-                  <CardFooter>
+                  <CardFooter className="pt-2">
                     <div className="flex gap-2 w-full">
                       <Button
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 hover:bg-red-50 hover:text-red-700 hover:border-red-200"
                         onClick={() => submitVote(property.id, false)}
                         disabled={!walletConnected}
                       >
@@ -494,7 +495,7 @@ export default function VerifyPage() {
                         Reject
                       </Button>
                       <Button
-                        className="flex-1"
+                        className="flex-1 hover:bg-green-50 hover:text-green-700 hover:border-green-200"
                         onClick={() => submitVote(property.id, true)}
                         disabled={!walletConnected}
                       >
@@ -510,9 +511,51 @@ export default function VerifyPage() {
         </TabsContent>
 
         <TabsContent value="approved" className="mt-6">
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">Approved properties will appear here</p>
-          </div>
+          {properties.filter(p => p.isVerified && !p.isValuationUpdate).length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No approved properties</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {properties.filter(p => p.isVerified && !p.isValuationUpdate).map((property) => (
+                <Card key={property.id} className="relative overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="line-clamp-1 text-lg">{property.address}</CardTitle>
+                    <CardDescription className="flex items-center gap-2">
+                      <span>By {property.ownerName}</span>
+                      <span>•</span>
+                      <span>{property.submittedDate}</span>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="relative w-full aspect-square mb-4 rounded-lg overflow-hidden bg-muted">
+                      <img
+                        src={property.image}
+                        alt={property.address}
+                        className="object-cover w-full h-full"
+                        onError={(e) => {
+                          console.log("Image failed to load:", property.image)
+                          e.currentTarget.src = "/placeholder.svg?height=400&width=400"
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Property Type</span>
+                        <Badge variant="secondary">{property.propertyType}</Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Current Value</span>
+                        <span className="text-sm font-semibold">
+                          {ethers.formatEther(property.estimatedValue?.toString() || "0")} ETH
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="rejected" className="mt-6">

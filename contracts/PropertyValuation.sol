@@ -40,6 +40,7 @@ contract PropertyValuation is Ownable {
     }
 
     mapping(uint256 => Valuation) public pendingValuations;
+    mapping(uint256 => mapping(address => bool)) public pendingValuationVotes;
     
     event ValuationUpdated(uint256 indexed tokenId, uint256 estimatedValue, uint256 comparableValue);
     event ValuationSubmitted(uint256 indexed tokenId, uint256 estimatedValue, uint256 comparableValue);
@@ -94,11 +95,11 @@ contract PropertyValuation is Ownable {
     function voteOnValuation(uint256 _tokenId, bool _approve) public {
         require(propertyNFT.ownerOf(_tokenId) != address(0), "Property does not exist");
         require(!pendingValuations[_tokenId].isVerified, "Valuation already verified");
-        require(!valuations[_tokenId].hasVoted[msg.sender], "Already voted");
+        require(!pendingValuationVotes[_tokenId][msg.sender], "Already voted");
         require(propertyNFT.ownerOf(_tokenId) != msg.sender, "Cannot vote on own property");
         
         Valuation storage valuation = pendingValuations[_tokenId];
-        valuations[_tokenId].hasVoted[msg.sender] = true;
+        pendingValuationVotes[_tokenId][msg.sender] = true;
         
         if (_approve) {
             valuation.verificationVotes++;
@@ -106,22 +107,26 @@ contract PropertyValuation is Ownable {
             
             if (valuation.verificationVotes >= VERIFICATION_THRESHOLD) {
                 valuation.isVerified = true;
+                // Store the values before clearing
+                uint256 finalValue = valuation.estimatedValue;
+                uint256 finalComparable = valuation.comparableValue;
                 // Add to historical values
-                historicalValues[_tokenId].push(valuation.estimatedValue);
+                historicalValues[_tokenId].push(finalValue);
                 // Update the main contract's estimated value
-                propertyNFT.updatePropertyValue(_tokenId, valuation.estimatedValue);
+                propertyNFT.updatePropertyValue(_tokenId, finalValue);
                 // Clear pending valuation
                 delete pendingValuations[_tokenId];
                 emit ValuationVerified(_tokenId, true);
-                emit ValuationUpdated(_tokenId, valuation.estimatedValue, valuation.comparableValue);
+                emit ValuationUpdated(_tokenId, finalValue, finalComparable);
             }
         } else {
             valuation.rejectionVotes++;
             emit ValuationVoteCast(_tokenId, msg.sender, false);
             
             if (valuation.rejectionVotes >= REJECTION_THRESHOLD) {
-                // Clear pending valuation
+                // Clear pending valuation and votes
                 delete pendingValuations[_tokenId];
+                // No need to delete the entire mapping, just let it be
                 emit ValuationVerified(_tokenId, false);
             }
         }
