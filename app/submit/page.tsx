@@ -107,6 +107,7 @@ export default function SubmitPage() {
       await (window.ethereum as EthereumProvider).request({ method: "eth_requestAccounts" })
       const provider = new ethers.BrowserProvider(window.ethereum as EthereumProvider)
       const signer = await provider.getSigner()
+      const ownerAddress = await signer.getAddress()
 
       // Create contract instance
       const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI, signer)
@@ -126,10 +127,22 @@ export default function SubmitPage() {
       )
 
       // Wait for transaction to be mined
-      await tx.wait()
+      const receipt = await tx.wait()
+      
+      // Get the PropertySubmitted event
+      const event = receipt.logs.find(
+        (log: any) => log.fragment && log.fragment.name === "PropertySubmitted"
+      )
+      
+      if (event) {
+        console.log("Property submitted successfully!", {
+          tokenId: event.args.tokenId.toString(),
+          owner: ownerAddress,
+          address: formData.address
+        })
+      }
       
       setIsSubmitted(true)
-      console.log("Property submitted successfully!")
     } catch (err) {
       console.error("Error submitting property:", err)
       setError(err instanceof Error ? err.message : "Failed to submit property")

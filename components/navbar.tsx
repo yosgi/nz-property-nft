@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { ModeToggle } from "./mode-toggle"
+import { WalletConnect } from "@/components/mode-toggle"
 
 export default function Navbar() {
   const pathname = usePathname()
@@ -40,7 +40,7 @@ export default function Navbar() {
           </nav>
         </div>
         <div className="ml-auto flex items-center space-x-4">
-          <ModeToggle />
+          <WalletConnect />
         </div>
       </div>
     </header>
