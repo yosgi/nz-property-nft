@@ -19,35 +19,20 @@ module.exports = async (callback) => {
     const propertyValuation = await PropertyValuation.new(propertyNFT.address, { from: accounts[0] })
     console.log("PropertyValuation deployed at:", propertyValuation.address)
 
-    // Submit a sample property
-    console.log("Submitting sample property...")
-    const result = await propertyNFT.submitProperty(
-      "123 Blockchain Ave, Crypto City, CC 12345",
-      "Alex Blockchain",
-      "Single Family Home",
-      Math.floor(Date.now() / 1000) - 86400 * 30, // 30 days ago
-      "https://example.com/metadata/1",
-      { from: accounts[0] },
-    )
+    // Get network info
+    const networkId = await web3.eth.net.getId()
+    console.log("Network ID:", networkId)
 
-    console.log("Sample property submitted with token ID:", result.logs[0].args.tokenId.toString())
-
-    // Update valuation for the sample property
-    console.log("Updating sample property valuation...")
-    await propertyValuation.updateValuation(
-      0, // token ID
-      1250000, // estimated value ($1,250,000)
-      1200000, // comparable value ($1,200,000)
-      85, // location score
-      72, // size score
-      90, // condition score
-      65, // age score
-      88, // renovation score
-      { from: accounts[0] },
-    )
-
-    console.log("Sample property valuation updated")
-    console.log("Deployment completed successfully!")
+    // Update environment variables based on network
+    if (networkId === 11155111) { // Sepolia
+      console.log("\nUpdate your .env.sepolia file with these values:")
+      console.log(`NEXT_PUBLIC_PROPERTY_NFT_ADDRESS="${propertyNFT.address}"`)
+      console.log(`NEXT_PUBLIC_PROPERTY_VALUATION_ADDRESS="${propertyValuation.address}"`)
+    } else { // Development (Ganache)
+      console.log("\nUpdate your .env.development file with these values:")
+      console.log(`NEXT_PUBLIC_PROPERTY_NFT_ADDRESS="${propertyNFT.address}"`)
+      console.log(`NEXT_PUBLIC_PROPERTY_VALUATION_ADDRESS="${propertyValuation.address}"`)
+    }
 
     callback()
   } catch (error) {

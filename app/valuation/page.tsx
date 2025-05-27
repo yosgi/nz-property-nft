@@ -54,17 +54,11 @@ interface ValuationData {
 
 // Format currency
 const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-NZ", {
     style: "currency",
-    currency: "USD",
+    currency: "NZD",
     maximumFractionDigits: 0,
   }).format(value)
-}
-
-// Convert ETH to USDT
-const convertEthToUsdt = (ethValue: bigint): number => {
-  const ethAmount = Number(ethers.formatEther(ethValue))
-  return ethAmount * 2500 // 1 ETH = 2500 USDT
 }
 
 // Calculate percentage difference
@@ -208,10 +202,9 @@ export default function ValuationPage() {
           const propData = await contract.getProperty(i)
           // Only include verified properties with valid values
           if (propData.isVerified && propData.estimatedValue) {
-            // Convert BigInt to number using ethers.formatEther
-            const value = Number(ethers.formatEther(propData.estimatedValue))
-            // Only include values within reasonable range (e.g., 0.1 ETH to 1000 ETH)
-            if (value > 0.1 && value < 1000) {
+            const value = Number(ethers.formatEther(propData.estimatedValue)) * 5000 // Convert to NZD
+            // Only include values within reasonable range (e.g., 500 NZD to 5,000,000 NZD)
+            if (value > 500 && value < 5000000) {
               properties.push({
                 address: propData.propertyAddress,
                 estimatedValue: value
@@ -224,18 +217,54 @@ export default function ValuationPage() {
       }
 
       // Calculate comparable value (average of verified properties)
-      // Only use values if we have enough data points (at least 3)
-      const comparableValue = properties.length >= 3
+      const comparableValue = properties.length >= 2
         ? properties.reduce((acc, p) => acc + p.estimatedValue, 0) / properties.length
         : 0
 
-      // Generate historical values (mock data for now)
-      const historicalValues = Array.from({ length: 10 }, (_, i) => ({
-        month: new Date(Date.now() - (9 - i) * 30 * 24 * 60 * 60 * 1000).toLocaleString('default', { month: 'short' }),
-        value: Number(ethers.formatEther(propertyData.estimatedValue)) * (0.9 + (i * 0.02)), // Simulate gradual increase
-      }))
+      // Generate historical values with realistic fluctuations
+      const generateHistoricalValues = (baseValue: number) => {
+        const months = 12
+        const values = []
+        let currentValue = baseValue
+        
+        // Seasonal factors (higher in spring/summer, lower in fall/winter)
+        const seasonalFactors = {
+          'Jan': 0.98, 'Feb': 0.99, 'Mar': 1.01, 'Apr': 1.02,
+          'May': 1.03, 'Jun': 1.02, 'Jul': 1.01, 'Aug': 1.00,
+          'Sep': 0.99, 'Oct': 0.98, 'Nov': 0.97, 'Dec': 0.98
+        }
+        
+        // Generate values for the last 12 months
+        for (let i = 0; i < months; i++) {
+          const date = new Date()
+          date.setMonth(date.getMonth() - (months - 1 - i))
+          const month = date.toLocaleString('default', { month: 'short' })
+          
+          // Add random fluctuation (-2% to +2%)
+          const randomFactor = 0.98 + Math.random() * 0.04
+          
+          // Apply seasonal factor
+          const seasonalFactor = seasonalFactors[month as keyof typeof seasonalFactors]
+          
+          // Calculate new value with both random and seasonal factors
+          currentValue = currentValue * randomFactor * seasonalFactor
+          
+          // Add small trend factor (slight upward trend)
+          const trendFactor = 1 + (i * 0.001) // 0.1% increase per month
+          
+          values.push({
+            month,
+            value: currentValue * trendFactor
+          })
+        }
+        
+        return values
+      }
 
-      // Generate comparable properties (mock data for now)
+      // Generate historical values using the new function
+      const historicalValues = generateHistoricalValues(Number(ethers.formatEther(propertyData.estimatedValue)) * 5000)
+
+      // Generate comparable properties
       const comparableProperties = properties.slice(0, 3).map((p, i) => ({
         address: p.address,
         value: p.estimatedValue,
@@ -262,8 +291,8 @@ export default function ValuationPage() {
       setValuationData({
         id: selectedPropertyId,
         address: propertyData.propertyAddress,
-        estimatedValue: convertEthToUsdt(propertyData.estimatedValue),
-        comparableValue: comparableValue * 2500, // Convert to USDT
+        estimatedValue: Number(ethers.formatEther(propertyData.estimatedValue)) * 5000,
+        comparableValue: comparableValue,
         lastUpdated: new Date().toLocaleDateString(),
         factors: [
           { name: "Location", score: Number(propertyData.locationScore) || defaultScores.locationScore },
@@ -274,17 +303,17 @@ export default function ValuationPage() {
         ],
         historicalValues: historicalValues.map(value => ({
           month: value.month,
-          value: value.value * 2500 // Convert to USDT
+          value: value.value
         })),
         comparableProperties: comparableProperties.map(prop => ({
           address: prop.address,
-          value: prop.value * 2500, // Convert to USDT
+          value: prop.value,
           distance: prop.distance,
         })),
         owner,
         pendingValuation: pendingValuation && pendingValuation[0] > 0 ? {
-          isVerified: pendingValuation[8], // isVerified is at index 8
-          value: Number(ethers.formatEther(pendingValuation[0])) * 2500 // estimatedValue is at index 0
+          isVerified: pendingValuation[8],
+          value: Number(ethers.formatEther(pendingValuation[0])) * 5000
         } : undefined
       })
     } catch (err) {
@@ -310,27 +339,27 @@ export default function ValuationPage() {
       const signer = await provider.getSigner()
       const valuationContract = new ethers.Contract(VALUATION_CONTRACT_ADDRESS, valuationContractArtifact.abi, signer)
 
-      // Convert USDT to ETH (divide by 2500)
-      const ethValue = Number(newValuation) / 2500
+      // Convert NZD to Wei (divide by 5000 to get ETH equivalent, then convert to Wei)
+      const ethValue = Number(newValuation) / 5000
       const valuationInWei = ethers.parseEther(ethValue.toString())
       
       // Submit valuation for verification
       const tx = await valuationContract.submitValuation(
         selectedPropertyId,
         valuationInWei,
-        valuationInWei, // Using same value for comparable value for now
-        valuationData.factors[0].score, // locationScore
-        valuationData.factors[1].score, // sizeScore
-        valuationData.factors[2].score, // conditionScore
-        valuationData.factors[3].score, // ageScore
-        valuationData.factors[4].score  // renovationScore
+        valuationInWei,
+        valuationData.factors[0].score,
+        valuationData.factors[1].score,
+        valuationData.factors[2].score,
+        valuationData.factors[3].score,
+        valuationData.factors[4].score
       )
       await tx.wait()
 
       toast.success("Property valuation submitted for verification")
       setIsUpdateDialogOpen(false)
       setNewValuation("")
-      await fetchValuationData() // Refresh the valuation data
+      await fetchValuationData()
     } catch (err) {
       console.error("Error updating valuation:", err)
       setError(err instanceof Error ? err.message : "Failed to update valuation")
@@ -595,12 +624,12 @@ export default function ValuationPage() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="valuation">New Valuation (USDT)</Label>
+              <Label htmlFor="valuation">New Valuation (NZD)</Label>
               <Input
                 id="valuation"
                 type="number"
                 step="1"
-                placeholder="Enter new valuation in USDT"
+                placeholder="Enter new valuation in NZD"
                 value={newValuation}
                 onChange={(e) => setNewValuation(e.target.value)}
               />

@@ -71,6 +71,22 @@ const convertIPFStoHTTP = (ipfsUrl: string) => {
   return ipfsUrl
 }
 
+// Format currency
+const formatCurrency = (value: number | undefined) => {
+  if (value === undefined) return "N/A"
+  return new Intl.NumberFormat("en-NZ", {
+    style: "currency",
+    currency: "NZD",
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+// Convert Wei to NZD
+const convertWeiToNzd = (weiValue: bigint): number => {
+  const ethValue = Number(ethers.formatEther(weiValue))
+  return ethValue * 5000 // 1 ETH = 5000 NZD
+}
+
 interface Property {
   id: string
   address: string
@@ -83,11 +99,11 @@ interface Property {
     reject: number
   }
   isVerified: boolean
-  estimatedValue?: bigint
+  estimatedValue?: number
   isValuationUpdate?: boolean
   owner: string
   pendingValuation?: {
-    value: bigint
+    value: number
     votes: {
       approve: number
       reject: number
@@ -212,6 +228,12 @@ export default function VerifyPage() {
         const historicalValues = await valuationContract.getHistoricalValues(i)
         const hasHistoricalValues = historicalValues && historicalValues.length > 0
 
+        // Convert estimatedValue to NZD
+        let estimatedValueNzd: number | undefined = undefined
+        if (propertyData.estimatedValue && propertyData.estimatedValue > 0) {
+          estimatedValueNzd = convertWeiToNzd(propertyData.estimatedValue)
+        }
+
         propertiesData.push({
           id: i.toString(),
           address: propertyData.propertyAddress,
@@ -224,11 +246,11 @@ export default function VerifyPage() {
             reject: Number(propertyData.rejectionVotes) || 0
           },
           isVerified,
-          estimatedValue: propertyData.estimatedValue,
+          estimatedValue: estimatedValueNzd,
           isValuationUpdate: hasPendingValuation || hasHistoricalValues,
           owner: owner,
           pendingValuation: hasPendingValuation ? {
-            value: pendingValuation.estimatedValue,
+            value: convertWeiToNzd(pendingValuation.estimatedValue),
             votes: {
               approve: Number(pendingValuation.verificationVotes) || 0,
               reject: Number(pendingValuation.rejectionVotes) || 0
@@ -533,7 +555,7 @@ export default function VerifyPage() {
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium">New Valuation</span>
                           <span className="text-sm font-semibold">
-                            {ethers.formatEther(property.pendingValuation?.value.toString() || "0")} ETH
+                            {formatCurrency(property.pendingValuation?.value)}
                           </span>
                         </div>
                       )}
@@ -649,14 +671,14 @@ export default function VerifyPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Current Value</span>
                         <span className="text-sm font-semibold">
-                          {ethers.formatEther(property.estimatedValue?.toString() || "0")} ETH
+                          {formatCurrency(property.estimatedValue)}
                         </span>
                       </div>
                       {property.pendingValuation && (
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium">New Value</span>
                           <span className="text-sm font-semibold">
-                            {ethers.formatEther(property.pendingValuation.value.toString() || "0")} ETH
+                            {formatCurrency(property.pendingValuation.value)}
                           </span>
                         </div>
                       )}
@@ -764,7 +786,7 @@ export default function VerifyPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Current Value</span>
                         <span className="text-sm font-semibold">
-                          {ethers.formatEther(property.estimatedValue?.toString() || "0")} ETH
+                          {formatCurrency(property.estimatedValue)}
                         </span>
                       </div>
                     </div>
@@ -819,14 +841,14 @@ export default function VerifyPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-medium">Current Value</span>
                         <span className="text-sm font-semibold">
-                          {ethers.formatEther(property.estimatedValue?.toString() || "0")} ETH
+                          {formatCurrency(property.estimatedValue)}
                         </span>
                       </div>
                       {property.pendingValuation && (
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium">New Value</span>
                           <span className="text-sm font-semibold">
-                            {ethers.formatEther(property.pendingValuation.value.toString() || "0")} ETH
+                            {formatCurrency(property.pendingValuation.value)}
                           </span>
                         </div>
                       )}

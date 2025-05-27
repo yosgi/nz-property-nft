@@ -1,9 +1,11 @@
+require('dotenv').config();
+
 module.exports = {
     networks: {
       development: {
         host: "127.0.0.1", // Localhost (default: none)
-        port: 7545, // Standard Ganache port (default: none)
-        network_id: "*", // Any network (default: none)
+        port: 8545, // Standard Ganache port (default: none)
+        network_id: "1337", // Any network (default: none)
         gas: 6721975, // Gas limit
         gasPrice: 20000000000, // 20 gwei (in wei)
       },
@@ -14,6 +16,17 @@ module.exports = {
         gas: 6721975,
         gasPrice: 20000000000,
       },
+      sepolia: {
+        provider: () => new HDWalletProvider(
+          process.env.PRIVATE_KEY,
+          process.env.SEPOLIA_RPC_URL
+        ),
+        network_id: 11155111,
+        gas: 5500000,
+        confirmations: 2,
+        timeoutBlocks: 200,
+        skipDryRun: true
+      }
     },
   
     // Set default mocha options here, use special reporters etc.
@@ -24,7 +37,7 @@ module.exports = {
     // Configure your compilers
     compilers: {
       solc: {
-        version: "0.8.19", // Fetch exact version from solc-bin
+        version: "0.8.20", // Fetch exact version from solc-bin
         settings: {
           // See the solidity docs for advice about optimization and evmVersion
           optimizer: {
