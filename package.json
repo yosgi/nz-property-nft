@@ -6,9 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "compile": "truffle compile",
+    "migrate": "truffle migrate",
+    "migrate:reset": "truffle migrate --reset",
+    "test": "truffle test",
+    "console": "truffle console",
+    "ganache": "ganache-cli -p 8545 -m 'your twelve word mnemonic here for development only'",
+    "deploy:development": "truffle migrate --network development",
+    "deploy:ganache": "truffle migrate --network ganache"
   },
   "dependencies": {
+    "@openzeppelin/contracts": "^4.9.3",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -61,6 +70,9 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@truffle/hdwallet-provider": "^2.1.15",
+    "ganache-cli": "^6.12.2",
+    "truffle": "^5.11.5",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -68,5 +80,7 @@
     "postcss": "^8",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"
-  }
+  },
+  "keywords": ["blockchain", "ethereum", "smart-contracts", "nft", "real-estate", "property"],
+  "license": "MIT"
 }
