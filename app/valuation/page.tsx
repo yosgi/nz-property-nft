@@ -10,13 +10,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertTriangle, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import contractArtifact from "../../build/contracts/PropertyNFT.json"
+import valuationContractArtifact from "../../build/contracts/PropertyValuation.json"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || ""
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
+const VALUATION_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_VALUATION_ADDRESS || ""
 
 interface HistoricalValue {
   month: string
@@ -53,6 +55,12 @@ const formatCurrency = (value: number) => {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+// Convert ETH to USDT
+const convertEthToUsdt = (ethValue: bigint): number => {
+  const ethAmount = Number(ethers.formatEther(ethValue))
+  return ethAmount * 2500 // 1 ETH = 2500 USDT
 }
 
 // Calculate percentage difference
@@ -236,8 +244,8 @@ export default function ValuationPage() {
       setValuationData({
         id: selectedPropertyId,
         address: propertyData.propertyAddress,
-        estimatedValue: Number(propertyData.estimatedValue) || 0,
-        comparableValue,
+        estimatedValue: convertEthToUsdt(propertyData.estimatedValue),
+        comparableValue: comparableValue * 2500, // Convert to USDT
         lastUpdated: new Date().toLocaleDateString(),
         factors: [
           { name: "Location", score: Number(propertyData.locationScore) || defaultScores.locationScore },
@@ -246,8 +254,15 @@ export default function ValuationPage() {
           { name: "Age", score: adjustedAgeScore },
           { name: "Renovations", score: adjustedRenovationScore },
         ],
-        historicalValues,
-        comparableProperties,
+        historicalValues: historicalValues.map(value => ({
+          month: value.month,
+          value: value.value * 2500 // Convert to USDT
+        })),
+        comparableProperties: comparableProperties.map(prop => ({
+          address: prop.address,
+          value: prop.value * 2500, // Convert to USDT
+          distance: prop.distance,
+        })),
         owner,
       })
     } catch (err) {
@@ -259,7 +274,7 @@ export default function ValuationPage() {
   }
 
   const handleUpdateValuation = async () => {
-    if (!newValuation || !walletConnected) return
+    if (!newValuation || !walletConnected || !valuationData) return
 
     setIsUpdating(true)
     setError(null)
@@ -271,16 +286,26 @@ export default function ValuationPage() {
 
       const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
       const signer = await provider.getSigner()
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, contractArtifact.abi, signer)
+      const valuationContract = new ethers.Contract(VALUATION_CONTRACT_ADDRESS, valuationContractArtifact.abi, signer)
 
-      // Convert valuation to wei
-      const valuationInWei = ethers.parseEther(newValuation)
+      // Convert USDT to ETH (divide by 2500)
+      const ethValue = Number(newValuation) / 2500
+      const valuationInWei = ethers.parseEther(ethValue.toString())
       
-      // Update property value
-      const tx = await contract.updatePropertyValue(selectedPropertyId, valuationInWei)
+      // Submit valuation for verification
+      const tx = await valuationContract.submitValuation(
+        selectedPropertyId,
+        valuationInWei,
+        valuationInWei, // Using same value for comparable value for now
+        valuationData.factors[0].score, // locationScore
+        valuationData.factors[1].score, // sizeScore
+        valuationData.factors[2].score, // conditionScore
+        valuationData.factors[3].score, // ageScore
+        valuationData.factors[4].score  // renovationScore
+      )
       await tx.wait()
 
-      toast.success("Property valuation updated successfully")
+      toast.success("Property valuation submitted for verification")
       setIsUpdateDialogOpen(false)
       setNewValuation("")
       await fetchValuationData() // Refresh the valuation data
@@ -478,12 +503,12 @@ export default function ValuationPage() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="valuation">New Valuation (ETH)</Label>
+              <Label htmlFor="valuation">New Valuation (USDT)</Label>
               <Input
                 id="valuation"
                 type="number"
-                step="0.01"
-                placeholder="Enter new valuation"
+                step="1"
+                placeholder="Enter new valuation in USDT"
                 value={newValuation}
                 onChange={(e) => setNewValuation(e.target.value)}
               />

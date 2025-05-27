@@ -180,8 +180,8 @@ contract("PropertyNFT", (accounts) => {
       await propertyNFT.transferOwnership(propertyValuation.address, { from: owner })
     })
 
-    it("should update property valuation", async () => {
-      await propertyValuation.updateValuation(
+    it("should submit a new property valuation", async () => {
+      const result = await propertyValuation.submitValuation(
         0,
         1250000, // estimated value
         1200000, // comparable value
@@ -190,23 +190,152 @@ contract("PropertyNFT", (accounts) => {
         90, // condition score
         65, // age score
         88, // renovation score
-        { from: owner },
+        { from: user1 },
       )
+
+      const submittedEvent = result.logs.find(log => log.event === "ValuationSubmitted")
+      assert.isNotNull(submittedEvent, "ValuationSubmitted event not found")
+      assert.equal(submittedEvent.args.tokenId, 0)
+      assert.equal(submittedEvent.args.estimatedValue, 1250000)
+      assert.equal(submittedEvent.args.comparableValue, 1200000)
 
       const valuation = await propertyValuation.getValuation(0)
       assert.equal(valuation.estimatedValue, 1250000)
-      assert.equal(valuation.comparableValue, 1200000)
-      assert.equal(valuation.locationScore, 85)
+      assert.equal(valuation.isVerified, false)
     })
 
-    it("should track historical values", async () => {
-      await propertyValuation.updateValuation(0, 1200000, 1150000, 85, 72, 90, 65, 88, { from: owner })
-      await propertyValuation.updateValuation(0, 1250000, 1200000, 85, 72, 90, 65, 88, { from: owner })
+    it("should allow voting on property valuation", async () => {
+      await propertyValuation.submitValuation(
+        0,
+        1250000,
+        1200000,
+        85,
+        72,
+        90,
+        65,
+        88,
+        { from: user1 },
+      )
 
+      const result = await propertyValuation.voteOnValuation(0, true, { from: user2 })
+      const voteEvent = result.logs.find(log => log.event === "ValuationVoteCast")
+      assert.isNotNull(voteEvent, "ValuationVoteCast event not found")
+      assert.equal(voteEvent.args.tokenId, 0)
+      assert.equal(voteEvent.args.voter, user2)
+      assert.equal(voteEvent.args.approve, true)
+    })
+
+    it("should not allow owner to vote on their own property valuation", async () => {
+      await propertyValuation.submitValuation(
+        0,
+        1250000,
+        1200000,
+        85,
+        72,
+        90,
+        65,
+        88,
+        { from: user1 },
+      )
+
+      try {
+        await propertyValuation.voteOnValuation(0, true, { from: user1 })
+        assert.fail("Should have thrown an error")
+      } catch (error) {
+        assert.include(error.message, "Cannot vote on own property")
+      }
+    })
+
+    it("should not allow double voting on valuation", async () => {
+      await propertyValuation.submitValuation(
+        0,
+        1250000,
+        1200000,
+        85,
+        72,
+        90,
+        65,
+        88,
+        { from: user1 },
+      )
+
+      await propertyValuation.voteOnValuation(0, true, { from: user2 })
+
+      try {
+        await propertyValuation.voteOnValuation(0, false, { from: user2 })
+        assert.fail("Should have thrown an error")
+      } catch (error) {
+        assert.include(error.message, "Already voted")
+      }
+    })
+
+    it("should verify valuation when threshold is reached", async () => {
+      await propertyValuation.submitValuation(
+        0,
+        1250000,
+        1200000,
+        85,
+        72,
+        90,
+        65,
+        88,
+        { from: user1 },
+      )
+
+      // Need 3 votes for verification
+      const requiredVoters = accounts.slice(2, 5) // Get exactly 3 voters
+
+      // Cast all votes
+      for (let i = 0; i < requiredVoters.length; i++) {
+        const voter = requiredVoters[i]
+        await propertyValuation.voteOnValuation(0, true, { from: voter })
+      }
+
+      // Check if valuation is verified
+      const valuation = await propertyValuation.getValuation(0)
+      assert.equal(valuation.verificationVotes, 3, "Should have exactly 3 verification votes")
+      assert.equal(valuation.isVerified, true, "Valuation should be verified after reaching threshold")
+
+      // Check if historical values were updated
       const historicalValues = await propertyValuation.getHistoricalValues(0)
-      assert.equal(historicalValues.length, 2)
-      assert.equal(historicalValues[0], 1200000)
-      assert.equal(historicalValues[1], 1250000)
+      assert.equal(historicalValues.length, 1)
+      assert.equal(historicalValues[0], 1250000)
+
+      // Check if main contract's value was updated
+      const property = await propertyNFT.getProperty(0)
+      assert.equal(property.estimatedValue, 1250000)
+    })
+
+    it("should reject valuation when rejection threshold is reached", async () => {
+      await propertyValuation.submitValuation(
+        0,
+        1250000,
+        1200000,
+        85,
+        72,
+        90,
+        65,
+        88,
+        { from: user1 },
+      )
+
+      // Need 2 votes for rejection
+      const rejectVoters = accounts.slice(2, 4) // Get exactly 2 voters
+
+      // Cast rejection votes
+      for (let i = 0; i < rejectVoters.length; i++) {
+        const voter = rejectVoters[i]
+        await propertyValuation.voteOnValuation(0, false, { from: voter })
+      }
+
+      // Check if valuation was rejected
+      const valuation = await propertyValuation.getValuation(0)
+      assert.equal(valuation.rejectionVotes, 2, "Should have exactly 2 rejection votes")
+      assert.equal(valuation.isVerified, false, "Valuation should not be verified after rejection")
+
+      // Check that historical values were not updated
+      const historicalValues = await propertyValuation.getHistoricalValues(0)
+      assert.equal(historicalValues.length, 0)
     })
   })
 })

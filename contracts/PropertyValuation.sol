@@ -16,21 +16,48 @@ contract PropertyValuation is Ownable {
         uint256 conditionScore;
         uint256 ageScore;
         uint256 renovationScore;
+        bool isVerified;
+        uint256 verificationVotes;
+        uint256 rejectionVotes;
+        mapping(address => bool) hasVoted;
     }
     
     mapping(uint256 => ValuationData) public valuations;
     mapping(uint256 => uint256[]) public historicalValues;
     
+    struct Valuation {
+        uint256 estimatedValue;
+        uint256 comparableValue;
+        uint256 lastUpdated;
+        uint256 locationScore;
+        uint256 sizeScore;
+        uint256 conditionScore;
+        uint256 ageScore;
+        uint256 renovationScore;
+        bool isVerified;
+        uint256 verificationVotes;
+        uint256 rejectionVotes;
+    }
+
+    mapping(uint256 => Valuation) public pendingValuations;
+    
     event ValuationUpdated(uint256 indexed tokenId, uint256 estimatedValue, uint256 comparableValue);
+    event ValuationSubmitted(uint256 indexed tokenId, uint256 estimatedValue, uint256 comparableValue);
+    event ValuationVerified(uint256 indexed tokenId, bool verified);
+    event ValuationVoteCast(uint256 indexed tokenId, address indexed voter, bool approve);
+    
+    // Constants
+    uint256 public constant VERIFICATION_THRESHOLD = 3;
+    uint256 public constant REJECTION_THRESHOLD = 2;
     
     constructor(address _propertyNFTAddress) {
         propertyNFT = PropertyNFT(_propertyNFTAddress);
     }
     
     /**
-     * @dev Update property valuation
+     * @dev Submit a new property valuation for verification
      */
-    function updateValuation(
+    function submitValuation(
         uint256 _tokenId,
         uint256 _estimatedValue,
         uint256 _comparableValue,
@@ -39,33 +66,97 @@ contract PropertyValuation is Ownable {
         uint256 _conditionScore,
         uint256 _ageScore,
         uint256 _renovationScore
-    ) public onlyOwner {
+    ) public {
         require(propertyNFT.ownerOf(_tokenId) != address(0), "Property does not exist");
+        require(propertyNFT.ownerOf(_tokenId) == msg.sender || owner() == msg.sender, "Not authorized");
         
-        ValuationData storage valuation = valuations[_tokenId];
-        valuation.estimatedValue = _estimatedValue;
-        valuation.comparableValue = _comparableValue;
-        valuation.lastUpdated = block.timestamp;
-        valuation.locationScore = _locationScore;
-        valuation.sizeScore = _sizeScore;
-        valuation.conditionScore = _conditionScore;
-        valuation.ageScore = _ageScore;
-        valuation.renovationScore = _renovationScore;
+        // Store in pendingValuations
+        pendingValuations[_tokenId] = Valuation({
+            estimatedValue: _estimatedValue,
+            comparableValue: _comparableValue,
+            lastUpdated: block.timestamp,
+            locationScore: _locationScore,
+            sizeScore: _sizeScore,
+            conditionScore: _conditionScore,
+            ageScore: _ageScore,
+            renovationScore: _renovationScore,
+            isVerified: false,
+            verificationVotes: 0,
+            rejectionVotes: 0
+        });
         
-        // Add to historical values
-        historicalValues[_tokenId].push(_estimatedValue);
+        emit ValuationSubmitted(_tokenId, _estimatedValue, _comparableValue);
+    }
+    
+    /**
+     * @dev Vote on property valuation
+     */
+    function voteOnValuation(uint256 _tokenId, bool _approve) public {
+        require(propertyNFT.ownerOf(_tokenId) != address(0), "Property does not exist");
+        require(!pendingValuations[_tokenId].isVerified, "Valuation already verified");
+        require(!valuations[_tokenId].hasVoted[msg.sender], "Already voted");
+        require(propertyNFT.ownerOf(_tokenId) != msg.sender, "Cannot vote on own property");
         
-        // Update the main contract's estimated value
-        propertyNFT.updatePropertyValue(_tokenId, _estimatedValue);
+        Valuation storage valuation = pendingValuations[_tokenId];
+        valuations[_tokenId].hasVoted[msg.sender] = true;
         
-        emit ValuationUpdated(_tokenId, _estimatedValue, _comparableValue);
+        if (_approve) {
+            valuation.verificationVotes++;
+            emit ValuationVoteCast(_tokenId, msg.sender, true);
+            
+            if (valuation.verificationVotes >= VERIFICATION_THRESHOLD) {
+                valuation.isVerified = true;
+                // Add to historical values
+                historicalValues[_tokenId].push(valuation.estimatedValue);
+                // Update the main contract's estimated value
+                propertyNFT.updatePropertyValue(_tokenId, valuation.estimatedValue);
+                // Clear pending valuation
+                delete pendingValuations[_tokenId];
+                emit ValuationVerified(_tokenId, true);
+                emit ValuationUpdated(_tokenId, valuation.estimatedValue, valuation.comparableValue);
+            }
+        } else {
+            valuation.rejectionVotes++;
+            emit ValuationVoteCast(_tokenId, msg.sender, false);
+            
+            if (valuation.rejectionVotes >= REJECTION_THRESHOLD) {
+                // Clear pending valuation
+                delete pendingValuations[_tokenId];
+                emit ValuationVerified(_tokenId, false);
+            }
+        }
     }
     
     /**
      * @dev Get valuation data
      */
-    function getValuation(uint256 _tokenId) public view returns (ValuationData memory) {
-        return valuations[_tokenId];
+    function getValuation(uint256 _tokenId) public view returns (
+        uint256 estimatedValue,
+        uint256 comparableValue,
+        uint256 lastUpdated,
+        uint256 locationScore,
+        uint256 sizeScore,
+        uint256 conditionScore,
+        uint256 ageScore,
+        uint256 renovationScore,
+        bool isVerified,
+        uint256 verificationVotes,
+        uint256 rejectionVotes
+    ) {
+        ValuationData storage valuation = valuations[_tokenId];
+        return (
+            valuation.estimatedValue,
+            valuation.comparableValue,
+            valuation.lastUpdated,
+            valuation.locationScore,
+            valuation.sizeScore,
+            valuation.conditionScore,
+            valuation.ageScore,
+            valuation.renovationScore,
+            valuation.isVerified,
+            valuation.verificationVotes,
+            valuation.rejectionVotes
+        );
     }
     
     /**
@@ -73,5 +164,17 @@ contract PropertyValuation is Ownable {
      */
     function getHistoricalValues(uint256 _tokenId) public view returns (uint256[] memory) {
         return historicalValues[_tokenId];
+    }
+    
+    /**
+     * @dev Check if user has voted on a valuation
+     */
+    function hasUserVoted(uint256 _tokenId, address _user) public view returns (bool) {
+        return valuations[_tokenId].hasVoted[_user];
+    }
+
+    // Get pending valuation for a property
+    function getPendingValuation(uint256 propertyId) external view returns (Valuation memory) {
+        return pendingValuations[propertyId];
     }
 }

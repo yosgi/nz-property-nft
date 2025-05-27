@@ -20,8 +20,7 @@ import contractArtifact from "../../build/contracts/PropertyNFT.json"
 
 // Add contract ABI and address
 const contractABI = contractArtifact.abi
-
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || ""
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
 
 export default function SubmitPage() {
   const [formData, setFormData] = useState({

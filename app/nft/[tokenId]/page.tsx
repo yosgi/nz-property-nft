@@ -22,7 +22,8 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import contractArtifact from "../../../build/contracts/PropertyNFT.json"
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || ""
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
+const VALUATION_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_VALUATION_ADDRESS || ""
 const ENS_REGISTRY = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
 
 interface PropertyData {
@@ -32,7 +33,7 @@ interface PropertyData {
   renovationDate: number
   tokenURI: string
   isVerified: boolean
-  estimatedValue: number
+  estimatedValue: bigint
   owner: string
 }
 
@@ -90,7 +91,7 @@ export default function NFTDetailPage() {
           renovationDate: Number(propertyData.renovationDate || 0),
           tokenURI: tokenURI || "",
           isVerified: propertyData.isVerified || false,
-          estimatedValue: Number(propertyData.estimatedValue || 0),
+          estimatedValue: propertyData.estimatedValue || BigInt(0),
           owner,
         })
       } catch (err) {
@@ -232,7 +233,7 @@ export default function NFTDetailPage() {
         renovationDate: Number(propertyData.renovationDate || 0),
         tokenURI: tokenURI || "",
         isVerified: propertyData.isVerified || false,
-        estimatedValue: Number(propertyData.estimatedValue || 0),
+        estimatedValue: propertyData.estimatedValue || BigInt(0),
         owner: newOwner,
       })
     } catch (err) {
@@ -329,7 +330,7 @@ export default function NFTDetailPage() {
                   <div>
                     <h3 className="font-semibold">Estimated Value</h3>
                     <p className="text-gray-600">
-                      {ethers.formatEther(property.estimatedValue)} ETH
+                      {ethers.formatEther(property.estimatedValue.toString())} ETH
                     </p>
                   </div>
                 </CardContent>

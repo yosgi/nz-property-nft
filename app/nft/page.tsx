@@ -9,14 +9,14 @@ import { Button } from "@/components/ui/button"
 import { PlusCircle, ExternalLink } from "lucide-react"
 import contractArtifact from "../../build/contracts/PropertyNFT.json"
 
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || ""
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
 
 interface Property {
   id: number
   address: string
   ownerName: string
   propertyType: string
-  estimatedValue: number
+  estimatedValue: bigint
   isVerified: boolean
   tokenURI: string
   owner: string
@@ -50,7 +50,7 @@ export default function NFTListPage() {
             address: propertyData.propertyAddress,
             ownerName: propertyData.ownerName,
             propertyType: propertyData.propertyType,
-            estimatedValue: Number(propertyData.estimatedValue),
+            estimatedValue: propertyData.estimatedValue,
             isVerified: propertyData.isVerified,
             tokenURI,
             owner,
@@ -138,7 +138,7 @@ export default function NFTListPage() {
                   <div>
                     <h3 className="text-sm font-medium text-gray-500">Estimated Value</h3>
                     <p className="text-sm font-semibold">
-                      {ethers.formatEther(property.estimatedValue)} ETH
+                      {ethers.formatEther(property.estimatedValue.toString())} ETH
                     </p>
                   </div>
                 </div>
