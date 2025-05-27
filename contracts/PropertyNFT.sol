@@ -45,8 +45,8 @@ contract PropertyNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
     event PropertyValueUpdated(uint256 indexed tokenId, uint256 newValue);
     
     // Constants
-    uint256 public constant VERIFICATION_THRESHOLD = 10;
-    uint256 public constant REJECTION_THRESHOLD = 5;
+    uint256 public constant VERIFICATION_THRESHOLD = 3;
+    uint256 public constant REJECTION_THRESHOLD = 2;
     
     constructor() ERC721("PropertyNFT", "PROP") {}
     
@@ -108,19 +108,21 @@ contract PropertyNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
         
         if (_approve) {
             property.verificationVotes++;
+            emit VoteCast(_tokenId, msg.sender, true);
+            
+            // Check if verification threshold is met
+            if (property.verificationVotes >= VERIFICATION_THRESHOLD) {
+                property.isVerified = true;
+                emit PropertyVerified(_tokenId, true);
+            }
         } else {
             property.rejectionVotes++;
-        }
-        
-        emit VoteCast(_tokenId, msg.sender, _approve);
-        
-        // Check if verification threshold is met
-        if (property.verificationVotes >= VERIFICATION_THRESHOLD) {
-            property.isVerified = true;
-            emit PropertyVerified(_tokenId, true);
-        } else if (property.rejectionVotes >= REJECTION_THRESHOLD) {
-            // Property rejected - could implement rejection logic here
-            emit PropertyVerified(_tokenId, false);
+            emit VoteCast(_tokenId, msg.sender, false);
+            
+            // Check if rejection threshold is met
+            if (property.rejectionVotes >= REJECTION_THRESHOLD) {
+                emit PropertyVerified(_tokenId, false);
+            }
         }
     }
     

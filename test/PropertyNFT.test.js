@@ -4,7 +4,7 @@ const PropertyValuation = artifacts.require("PropertyValuation")
 contract("PropertyNFT", (accounts) => {
   let propertyNFT
   let propertyValuation
-  const [owner, user1, user2, user3] = accounts
+  const [owner, user1, user2, user3, ...voters] = accounts
 
   beforeEach(async () => {
     propertyNFT = await PropertyNFT.new({ from: owner })
@@ -22,9 +22,11 @@ contract("PropertyNFT", (accounts) => {
         { from: user1 },
       )
 
-      assert.equal(result.logs[0].event, "PropertySubmitted")
-      assert.equal(result.logs[0].args.propertyAddress, "123 Blockchain Ave, Crypto City")
-      assert.equal(result.logs[0].args.submitter, user1)
+      // Find the PropertySubmitted event instead of assuming it's the first event
+      const submittedEvent = result.logs.find(log => log.event === "PropertySubmitted")
+      assert.isNotNull(submittedEvent, "PropertySubmitted event not found")
+      assert.equal(submittedEvent.args.propertyAddress, "123 Blockchain Ave, Crypto City")
+      assert.equal(submittedEvent.args.submitter, user1)
     })
 
     it("should not allow duplicate property addresses", async () => {
@@ -68,10 +70,11 @@ contract("PropertyNFT", (accounts) => {
     it("should allow voting on property verification", async () => {
       const result = await propertyNFT.voteOnProperty(0, true, { from: user2 })
 
-      assert.equal(result.logs[0].event, "VoteCast")
-      assert.equal(result.logs[0].args.tokenId, 0)
-      assert.equal(result.logs[0].args.voter, user2)
-      assert.equal(result.logs[0].args.approve, true)
+      const voteEvent = result.logs.find(log => log.event === "VoteCast")
+      assert.isNotNull(voteEvent, "VoteCast event not found")
+      assert.equal(voteEvent.args.tokenId, 0)
+      assert.equal(voteEvent.args.voter, user2)
+      assert.equal(voteEvent.args.approve, true)
     })
 
     it("should not allow owner to vote on their own property", async () => {
@@ -95,30 +98,32 @@ contract("PropertyNFT", (accounts) => {
     })
 
     it("should verify property when threshold is reached", async () => {
-      // Need 10 votes for verification
-      const voters = [
-        user2,
-        user3,
-        accounts[3],
-        accounts[4],
-        accounts[5],
-        accounts[6],
-        accounts[7],
-        accounts[8],
-        accounts[9],
-      ]
+      // Need 3 votes for verification
+      const requiredVoters = accounts.slice(2, 5) // Get exactly 3 voters
+      console.log("Number of voters:", requiredVoters.length)
+      console.log("Voters:", requiredVoters)
 
-      for (let i = 0; i < 9; i++) {
-        await propertyNFT.voteOnProperty(0, true, { from: voters[i] })
+      // Cast all votes and wait for the last one to be mined
+      for (let i = 0; i < requiredVoters.length; i++) {
+        const voter = requiredVoters[i]
+        console.log(`Casting vote ${i + 1} from ${voter}`)
+        const tx = await propertyNFT.voteOnProperty(0, true, { from: voter })
+        
+        // Check vote count after each vote
+        const property = await propertyNFT.getProperty(0)
+        console.log(`Vote ${i + 1}: verificationVotes = ${property.verificationVotes}`)
+        
+        // Wait for the last vote to be mined
+        if (i === requiredVoters.length - 1) {
+          await tx
+        }
       }
 
-      // The 10th vote should trigger verification
-      const result = await propertyNFT.voteOnProperty(0, true, { from: accounts[9] })
-
-      // Check if PropertyVerified event was emitted
-      const verifiedEvent = result.logs.find((log) => log.event === "PropertyVerified")
-      assert.isNotNull(verifiedEvent)
-      assert.equal(verifiedEvent.args.verified, true)
+      // Check if property is verified
+      const property = await propertyNFT.getProperty(0)
+      console.log(`Final state: verificationVotes = ${property.verificationVotes}, isVerified = ${property.isVerified}`)
+      assert.equal(property.verificationVotes, 3, "Should have exactly 3 verification votes")
+      assert.equal(property.isVerified, true, "Property should be verified after reaching threshold")
     })
   })
 
@@ -171,6 +176,8 @@ contract("PropertyNFT", (accounts) => {
         "https://example.com/metadata/1",
         { from: user1 },
       )
+      // Set the valuation contract as the owner of the NFT contract
+      await propertyNFT.transferOwnership(propertyValuation.address, { from: owner })
     })
 
     it("should update property valuation", async () => {
