@@ -107,29 +107,40 @@ contract PropertyValuation is Ownable {
             
             if (valuation.verificationVotes >= VERIFICATION_THRESHOLD) {
                 valuation.isVerified = true;
-                // Store the values before clearing
-                uint256 finalValue = valuation.estimatedValue;
-                uint256 finalComparable = valuation.comparableValue;
-                // Add to historical values
-                historicalValues[_tokenId].push(finalValue);
-                // Update the main contract's estimated value
-                propertyNFT.updatePropertyValue(_tokenId, finalValue);
-                // Clear pending valuation
-                delete pendingValuations[_tokenId];
                 emit ValuationVerified(_tokenId, true);
-                emit ValuationUpdated(_tokenId, finalValue, finalComparable);
             }
         } else {
             valuation.rejectionVotes++;
             emit ValuationVoteCast(_tokenId, msg.sender, false);
             
             if (valuation.rejectionVotes >= REJECTION_THRESHOLD) {
-                // Clear pending valuation and votes
+                // Clear pending valuation only on rejection
                 delete pendingValuations[_tokenId];
-                // No need to delete the entire mapping, just let it be
                 emit ValuationVerified(_tokenId, false);
             }
         }
+    }
+    
+    /**
+     * @dev Confirm valuation update (only property owner)
+     */
+    function confirmValuationUpdate(uint256 _tokenId) public {
+        require(propertyNFT.ownerOf(_tokenId) == msg.sender, "Not property owner");
+        require(pendingValuations[_tokenId].isVerified, "Valuation not verified");
+        
+        uint256 finalValue = pendingValuations[_tokenId].estimatedValue;
+        uint256 finalComparable = pendingValuations[_tokenId].comparableValue;
+        
+        // Update the main contract's estimated value
+        propertyNFT.updatePropertyValue(_tokenId, finalValue);
+        
+        // Add to historical values
+        historicalValues[_tokenId].push(finalValue);
+        
+        // Clear pending valuation
+        delete pendingValuations[_tokenId];
+        
+        emit ValuationUpdated(_tokenId, finalValue, finalComparable);
     }
     
     /**

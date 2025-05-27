@@ -8,7 +8,12 @@ module.exports = async (deployer) => {
 
   // Deploy PropertyValuation with PropertyNFT address
   await deployer.deploy(PropertyValuation, propertyNFT.address)
+  const propertyValuation = await PropertyValuation.deployed()
+
+  // Transfer ownership of PropertyNFT to PropertyValuation
+  await propertyNFT.transferOwnership(propertyValuation.address)
 
   console.log("PropertyNFT deployed at:", propertyNFT.address)
-  console.log("PropertyValuation deployed at:", (await PropertyValuation.deployed()).address)
+  console.log("PropertyValuation deployed at:", propertyValuation.address)
+  console.log("PropertyNFT ownership transferred to PropertyValuation")
 }

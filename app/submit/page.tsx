@@ -34,6 +34,42 @@ export default function SubmitPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [validationErrors, setValidationErrors] = useState<{
+    address?: string;
+    ownerName?: string;
+    renovationDate?: string;
+    propertyType?: string;
+    image?: string;
+  }>({})
+
+  const validateForm = () => {
+    const errors: {
+      address?: string;
+      ownerName?: string;
+      renovationDate?: string;
+      propertyType?: string;
+      image?: string;
+    } = {}
+
+    if (!formData.address.trim()) {
+      errors.address = "Property address is required"
+    }
+    if (!formData.ownerName.trim()) {
+      errors.ownerName = "Owner name is required"
+    }
+    if (!formData.renovationDate) {
+      errors.renovationDate = "Renovation date is required"
+    }
+    if (!formData.propertyType) {
+      errors.propertyType = "Property type is required"
+    }
+    if (!formData.image) {
+      errors.image = "Property image is required"
+    }
+
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -86,6 +122,11 @@ export default function SubmitPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!validateForm()) {
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
@@ -199,6 +240,9 @@ export default function SubmitPage() {
                   />
                 </label>
               </div>
+              {validationErrors.image && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.image}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -210,7 +254,11 @@ export default function SubmitPage() {
                 value={formData.address}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.address ? "border-red-500" : ""}
               />
+              {validationErrors.address && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.address}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -222,7 +270,11 @@ export default function SubmitPage() {
                 value={formData.ownerName}
                 onChange={handleInputChange}
                 required
+                className={validationErrors.ownerName ? "border-red-500" : ""}
               />
+              {validationErrors.ownerName && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.ownerName}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -234,6 +286,7 @@ export default function SubmitPage() {
                     className={cn(
                       "w-full justify-start text-left font-normal",
                       !formData.renovationDate && "text-muted-foreground",
+                      validationErrors.renovationDate ? "border-red-500" : ""
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -244,12 +297,22 @@ export default function SubmitPage() {
                   <Calendar mode="single" selected={formData.renovationDate} onSelect={handleDateChange} initialFocus />
                 </PopoverContent>
               </Popover>
+              {validationErrors.renovationDate && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.renovationDate}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="propertyType">Property Type</Label>
-              <Select onValueChange={handleSelectChange} value={formData.propertyType}>
-                <SelectTrigger id="propertyType">
+              <Select 
+                onValueChange={handleSelectChange} 
+                value={formData.propertyType}
+                required
+              >
+                <SelectTrigger 
+                  id="propertyType"
+                  className={validationErrors.propertyType ? "border-red-500" : ""}
+                >
                   <SelectValue placeholder="Select property type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -261,6 +324,9 @@ export default function SubmitPage() {
                   <SelectItem value="land">Land</SelectItem>
                 </SelectContent>
               </Select>
+              {validationErrors.propertyType && (
+                <p className="text-sm text-red-500 mt-1">{validationErrors.propertyType}</p>
+              )}
             </div>
           </CardContent>
           <CardFooter>

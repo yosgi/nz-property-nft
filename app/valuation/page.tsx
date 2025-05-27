@@ -46,6 +46,10 @@ interface ValuationData {
   historicalValues: HistoricalValue[]
   comparableProperties: ComparableProperty[]
   owner: string
+  pendingValuation?: {
+    isVerified: boolean
+    value: number
+  }
 }
 
 // Format currency
@@ -65,6 +69,7 @@ const convertEthToUsdt = (ethValue: bigint): number => {
 
 // Calculate percentage difference
 const calculateDifference = (value1: number, value2: number) => {
+  if (!value1 || !value2 || value2 === 0) return 0
   const diff = ((value1 - value2) / value2) * 100
   return diff.toFixed(1)
 }
@@ -93,6 +98,7 @@ export default function ValuationPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [ownedProperties, setOwnedProperties] = useState<{id: string, address: string}[]>([])
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>("")
+  const [isConfirming, setIsConfirming] = useState(false)
 
   // Check wallet connection on mount
   useEffect(() => {
@@ -173,6 +179,7 @@ export default function ValuationPage() {
 
       const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
       const contract = new ethers.Contract(CONTRACT_ADDRESS, contractArtifact.abi, provider)
+      const valuationContract = new ethers.Contract(VALUATION_CONTRACT_ADDRESS, valuationContractArtifact.abi, provider)
 
       if (!selectedPropertyId) {
         setValuationData(null)
@@ -187,6 +194,10 @@ export default function ValuationPage() {
       const owner = await contract.ownerOf(selectedPropertyId)
       console.log("Property owner:", owner)
 
+      // Get pending valuation data
+      const pendingValuation = await valuationContract.pendingValuations(selectedPropertyId)
+      console.log("Pending valuation:", pendingValuation)
+
       // Get total number of properties for comparable value calculation
       const totalProperties = await contract.getTotalProperties()
       const properties = []
@@ -195,11 +206,17 @@ export default function ValuationPage() {
       for (let i = 0; i < totalProperties; i++) {
         try {
           const propData = await contract.getProperty(i)
-          if (propData.isVerified) {
-            properties.push({
-              address: propData.propertyAddress,
-              estimatedValue: Number(propData.estimatedValue),
-            })
+          // Only include verified properties with valid values
+          if (propData.isVerified && propData.estimatedValue) {
+            // Convert BigInt to number using ethers.formatEther
+            const value = Number(ethers.formatEther(propData.estimatedValue))
+            // Only include values within reasonable range (e.g., 0.1 ETH to 1000 ETH)
+            if (value > 0.1 && value < 1000) {
+              properties.push({
+                address: propData.propertyAddress,
+                estimatedValue: value
+              })
+            }
           }
         } catch (err) {
           console.log(`Property ${i} not found`)
@@ -207,14 +224,15 @@ export default function ValuationPage() {
       }
 
       // Calculate comparable value (average of verified properties)
-      const comparableValue = properties.length > 0
+      // Only use values if we have enough data points (at least 3)
+      const comparableValue = properties.length >= 3
         ? properties.reduce((acc, p) => acc + p.estimatedValue, 0) / properties.length
         : 0
 
       // Generate historical values (mock data for now)
       const historicalValues = Array.from({ length: 10 }, (_, i) => ({
         month: new Date(Date.now() - (9 - i) * 30 * 24 * 60 * 60 * 1000).toLocaleString('default', { month: 'short' }),
-        value: Number(propertyData.estimatedValue) * (0.9 + (i * 0.02)), // Simulate gradual increase
+        value: Number(ethers.formatEther(propertyData.estimatedValue)) * (0.9 + (i * 0.02)), // Simulate gradual increase
       }))
 
       // Generate comparable properties (mock data for now)
@@ -264,6 +282,10 @@ export default function ValuationPage() {
           distance: prop.distance,
         })),
         owner,
+        pendingValuation: pendingValuation && pendingValuation[0] > 0 ? {
+          isVerified: pendingValuation[8], // isVerified is at index 8
+          value: Number(ethers.formatEther(pendingValuation[0])) * 2500 // estimatedValue is at index 0
+        } : undefined
       })
     } catch (err) {
       console.error("Error fetching valuation data:", err)
@@ -371,6 +393,76 @@ export default function ValuationPage() {
       fetchValuationData()
     }
   }, [selectedPropertyId])
+
+  const handleConfirmValuation = async () => {
+    if (!walletConnected || !valuationData) return
+
+    setIsConfirming(true)
+    setError(null)
+
+    try {
+      if (!window.ethereum) {
+        throw new Error("Please install MetaMask to confirm valuation")
+      }
+
+      const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
+      const signer = await provider.getSigner()
+      const valuationContract = new ethers.Contract(VALUATION_CONTRACT_ADDRESS, valuationContractArtifact.abi, signer)
+
+      console.log("Confirming valuation for property:", selectedPropertyId)
+      console.log("Using contract address:", VALUATION_CONTRACT_ADDRESS)
+      console.log("Contract ABI:", valuationContractArtifact.abi)
+      console.log("Current wallet address:", walletAddress)
+      console.log("Property owner:", valuationData.owner)
+      console.log("Is owner:", walletAddress?.toLowerCase() === valuationData.owner?.toLowerCase())
+      console.log("Pending valuation:", valuationData.pendingValuation)
+
+      // Check if the valuation is verified
+      if (!valuationData.pendingValuation?.isVerified) {
+        throw new Error("Valuation must be verified before confirmation")
+      }
+
+      // Check if the user is the owner
+      if (walletAddress?.toLowerCase() !== valuationData.owner?.toLowerCase()) {
+        throw new Error("Only the property owner can confirm valuation updates")
+      }
+
+      // Get the current pending valuation
+      const pendingValuation = await valuationContract.pendingValuations(selectedPropertyId)
+      console.log("Current pending valuation:", pendingValuation)
+
+      // Check if the valuation is still pending and verified
+      if (!pendingValuation[8]) { // isVerified is at index 8
+        throw new Error("Valuation is no longer verified")
+      }
+
+      // Submit confirmation for valuation
+      const tx = await valuationContract.confirmValuationUpdate(selectedPropertyId, {
+        gasLimit: 500000 // Add explicit gas limit
+      })
+      console.log("Transaction sent:", tx.hash)
+      
+      const receipt = await tx.wait()
+      console.log("Transaction confirmed:", receipt)
+
+      toast.success("Property valuation confirmed")
+      setIsUpdateDialogOpen(false)
+      await fetchValuationData() // Refresh the valuation data
+    } catch (err) {
+      console.error("Error confirming valuation:", err)
+      if (err instanceof Error) {
+        console.error("Error details:", {
+          message: err.message,
+          code: (err as any).code,
+          data: (err as any).data
+        })
+      }
+      setError(err instanceof Error ? err.message : "Failed to confirm valuation")
+      toast.error("Failed to confirm valuation")
+    } finally {
+      setIsConfirming(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -555,6 +647,29 @@ export default function ValuationPage() {
                     </Badge>
                     <span className="text-sm text-muted-foreground ml-2">vs. Comparable Value</span>
                   </div>
+                  {valuationData.pendingValuation && (
+                    <div className="mt-4 p-3 bg-muted rounded-lg">
+                      <div className="text-sm font-medium mb-1">Pending Update</div>
+                      <div className="text-lg font-bold text-blue-600">
+                        {formatCurrency(valuationData.pendingValuation.value)}
+                      </div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {valuationData.pendingValuation.isVerified 
+                          ? "Verified by 3 or more validators"
+                          : "Awaiting verification"}
+                      </div>
+                    </div>
+                  )}
+                  {valuationData.pendingValuation?.isVerified && 
+                   walletAddress?.toLowerCase() === valuationData.owner?.toLowerCase() && (
+                    <Button 
+                      className="mt-4 w-full"
+                      onClick={handleConfirmValuation}
+                      disabled={isConfirming}
+                    >
+                      {isConfirming ? "Confirming..." : "Confirm Valuation Update"}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
 

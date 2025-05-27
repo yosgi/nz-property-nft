@@ -316,13 +316,15 @@ contract("PropertyNFT", (accounts) => {
           assert.isNotNull(verifiedEvent, "ValuationVerified event not found")
           assert.equal(verifiedEvent.args.tokenId, 0)
           assert.equal(verifiedEvent.args.verified, true)
-
-          const updatedEvent = result.logs.find(log => log.event === "ValuationUpdated")
-          assert.isNotNull(updatedEvent, "ValuationUpdated event not found")
-          assert.equal(updatedEvent.args.tokenId, 0)
-          assert.equal(updatedEvent.args.estimatedValue, 1250000)
         }
       }
+
+      // Owner confirms the valuation update
+      const confirmResult = await propertyValuation.confirmValuationUpdate(0, { from: user1 })
+      const updatedEvent = confirmResult.logs.find(log => log.event === "ValuationUpdated")
+      assert.isNotNull(updatedEvent, "ValuationUpdated event not found")
+      assert.equal(updatedEvent.args.tokenId, 0)
+      assert.equal(updatedEvent.args.estimatedValue, 1250000)
 
       // Check if historical values were updated
       const historicalValues = await propertyValuation.getHistoricalValues(0)
@@ -378,6 +380,68 @@ contract("PropertyNFT", (accounts) => {
       assert.equal(historicalValues.length, 0)
 
       // Check that pending valuation was cleared
+      const pendingValuation = await propertyValuation.getPendingValuation(0)
+      assert.equal(pendingValuation.estimatedValue, 0, "Pending valuation should be cleared")
+    })
+
+    it("should handle property submission verification followed by valuation update", async () => {
+      // First, verify the property submission
+      const requiredVoters = accounts.slice(2, 5) // Get exactly 3 voters
+      
+      // Cast all votes for property verification
+      for (let i = 0; i < requiredVoters.length; i++) {
+        const voter = requiredVoters[i]
+        await propertyNFT.voteOnProperty(0, true, { from: voter })
+      }
+
+      // Verify property is verified
+      const property = await propertyNFT.getProperty(0)
+      assert.equal(property.isVerified, true, "Property should be verified")
+
+      // Now submit a valuation update
+      await propertyValuation.submitValuation(
+        0,
+        1250000, // estimated value
+        1200000, // comparable value
+        85, // location score
+        72, // size score
+        90, // condition score
+        65, // age score
+        88, // renovation score
+        { from: user1 },
+      )
+
+      // Use the same voters for valuation update
+      for (let i = 0; i < requiredVoters.length; i++) {
+        const voter = requiredVoters[i]
+        const result = await propertyValuation.voteOnValuation(0, true, { from: voter })
+        
+        // After the last vote, check if valuation was verified
+        if (i === requiredVoters.length - 1) {
+          const verifiedEvent = result.logs.find(log => log.event === "ValuationVerified")
+          assert.isNotNull(verifiedEvent, "ValuationVerified event not found")
+          assert.equal(verifiedEvent.args.tokenId, 0)
+          assert.equal(verifiedEvent.args.verified, true)
+        }
+      }
+
+      // Owner confirms the valuation update
+      const confirmResult = await propertyValuation.confirmValuationUpdate(0, { from: user1 })
+      const updatedEvent = confirmResult.logs.find(log => log.event === "ValuationUpdated")
+      assert.isNotNull(updatedEvent, "ValuationUpdated event not found")
+      assert.equal(updatedEvent.args.tokenId, 0)
+      assert.equal(updatedEvent.args.estimatedValue, 1250000)
+
+      // Verify the property value was updated
+      const updatedProperty = await propertyNFT.getProperty(0)
+      assert.equal(updatedProperty.estimatedValue, 1250000, "Property value should be updated")
+
+      // Verify historical values were updated
+      const historicalValues = await propertyValuation.getHistoricalValues(0)
+      assert.equal(historicalValues.length, 1, "Should have one historical value")
+      assert.equal(historicalValues[0], 1250000, "Historical value should match the update")
+
+      // Verify pending valuation was cleared
       const pendingValuation = await propertyValuation.getPendingValuation(0)
       assert.equal(pendingValuation.estimatedValue, 0, "Pending valuation should be cleared")
     })
