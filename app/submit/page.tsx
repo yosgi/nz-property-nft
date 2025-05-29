@@ -26,6 +26,21 @@ const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
 // Add Google Maps API key
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""
 
+const NZ_PROPERTY_TYPES = {
+  "HOUSE": "House",
+  "APARTMENT": "Apartment",
+  "TOWNHOUSE": "Townhouse",
+  "UNIT": "Unit",
+  "VILLA": "Villa",
+  "BUNGALOW": "Bungalow",
+  "TERRACE": "Terrace House",
+  "SECTION": "Section/Land",
+  "COMMERCIAL": "Commercial",
+  "RURAL": "Rural Property",
+  "LIFESTYLE": "Lifestyle Block",
+  "BACH": "Bach/Holiday Home"
+} as const
+
 export default function SubmitPage() {
   const [formData, setFormData] = useState({
     address: "",
@@ -387,12 +402,11 @@ export default function SubmitPage() {
                   <SelectValue placeholder="Select property type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="single-family">Single Family Home</SelectItem>
-                  <SelectItem value="condo">Condominium</SelectItem>
-                  <SelectItem value="townhouse">Townhouse</SelectItem>
-                  <SelectItem value="multi-family">Multi-Family</SelectItem>
-                  <SelectItem value="commercial">Commercial</SelectItem>
-                  <SelectItem value="land">Land</SelectItem>
+                  {Object.entries(NZ_PROPERTY_TYPES).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {validationErrors.propertyType && (

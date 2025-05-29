@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
 import { LoadScript, GoogleMap, StreetViewPanorama, Libraries } from '@react-google-maps/api';
-
+import CustomPopup from "./CustomPopup";
 const GOOGLE_MAPS_LIBRARIES: Libraries = ['places'];
 
 // Add Google Maps API types
@@ -13,14 +13,6 @@ declare global {
     google: any;
   }
 }
-
-interface PopupProps {
-  position: { x: number; y: number };
-  content: string;
-  onClose: () => void;
-  streetViewPosition?: { lat: number; lng: number };
-}
-
 // Add reverse geocoding function
 async function reverseGeocode(latitude: number, longitude: number): Promise<string> {
   try {
@@ -39,175 +31,31 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<stri
   }
 }
 
-function CustomPopup({ position, content, onClose, streetViewPosition }: PopupProps) {
-  const mapContainerStyle = {
-    height: '200px',
-    width: '100%',
-  };
-  const streetViewRef = useRef<HTMLDivElement>(null);
-  const [panorama, setPanorama] = useState<google.maps.StreetViewPanorama | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isApiLoaded, setIsApiLoaded] = useState(false);
 
-  const initializeStreetView = useCallback(() => {
-    if (streetViewPosition && streetViewRef.current && isApiLoaded) {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const newPanorama = new google.maps.StreetViewPanorama(
-          streetViewRef.current,
-          {
-            position: streetViewPosition,
-            pov: {
-              heading: 210,
-              pitch: 10,
-            },
-            addressControl: false,
-            showRoadLabels: false,
-            zoomControl: false,
-            fullscreenControl: false,
-            scrollwheel: false,
-            panControl: false,
-            motionTracking: false,
-            motionTrackingControl: false,
-            enableCloseButton: false,
-          }
-        );
 
-        newPanorama.addListener('status_changed', () => {
-          if (newPanorama.getStatus() === google.maps.StreetViewStatus.OK) {
-            setIsLoading(false);
-          } else {
-            setError('No street view available at this location');
-            setIsLoading(false);
-          }
-        });
-
-        setPanorama(newPanorama);
-      } catch (err) {
-        setError('Failed to load street view');
-        setIsLoading(false);
-      }
-    }
-  }, [streetViewPosition, isApiLoaded]);
-
-  useEffect(() => {
-    initializeStreetView();
-  }, [initializeStreetView]);
-
-  return (
-    <LoadScript
-      googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string}
-      libraries={GOOGLE_MAPS_LIBRARIES}
-      onLoad={() => setIsApiLoaded(true)}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          right: '20px',
-          top: '20px',
-          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-          padding: '15px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-          zIndex: 1000,
-          maxWidth: '300px',
-          backdropFilter: 'blur(5px)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-        }}
-      >
-        <div dangerouslySetInnerHTML={{ __html: content }} />
-        {streetViewPosition && (
-          <div 
-            ref={streetViewRef}
-            style={{ 
-              marginTop: '15px', 
-              borderRadius: '8px', 
-              overflow: 'hidden',
-              height: '200px',
-              width: '100%',
-              position: 'relative'
-            }}
-          >
-            {isLoading && (
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                zIndex: 1
-              }}>
-                Loading street view...
-              </div>
-            )}
-            {error && (
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                color: '#666',
-                zIndex: 1
-              }}>
-                {error}
-              </div>
-            )}
-          </div>
-        )}
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '8px',
-            right: '8px',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: '#666',
-            fontSize: '16px',
-            padding: '4px',
-            lineHeight: '1',
-            borderRadius: '50%',
-            width: '24px',
-            height: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'background-color 0.2s',
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-        >
-          ×
-        </button>
-      </div>
-    </LoadScript>
-  );
+interface Property {
+  id?: number;
+  address: string;
+  ownerName: string;
+  propertyType: string;
+  renovationDate: number;
+  imageURI: string;
+  latitude: number;
+  longitude: number;
+  isVerified: boolean;
+  estimatedValue: number;
 }
 
 
-export default function CesiumMap() {
+
+export default function CesiumMap({ properties }: { properties: Property[] }) {
   const cesiumContainerRef = useRef<HTMLDivElement>(null)
+  const osmBuildingsRef = useRef<any>(null);
   const [popup, setPopup] = useState<{ position: { x: number; y: number }; content: string; streetViewPosition?: { lat: number; lng: number } } | null>(null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 
   useEffect(() => {
+    let viewer: Cesium.Viewer;
     const loadCesium = async () => {
       try {
         // Initialize Cesium ion with your access token
@@ -215,7 +63,7 @@ export default function CesiumMap() {
         // @ts-ignore
         window.CESIUM_BASE_URL = '/static/cesium/';
         // Create the Cesium viewer
-        const viewer = new Cesium.Viewer(cesiumContainerRef.current!, {
+        viewer = new Cesium.Viewer(cesiumContainerRef.current!, {
           terrainProvider: await Cesium.createWorldTerrainAsync(),
           baseLayerPicker: true,
           geocoder: true,
@@ -227,10 +75,135 @@ export default function CesiumMap() {
           infoBox: true, // Disable default InfoBox
         })
 
+        // Add camera change listener
+        viewer.camera.changed.addEventListener(() => {
+          const position = viewer.camera.position;
+          const cartographic = Cesium.Cartographic.fromCartesian(position);
+          const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+          const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+          const height = cartographic.height;
+          
+          const heading = Cesium.Math.toDegrees(viewer.camera.heading);
+          const pitch = Cesium.Math.toDegrees(viewer.camera.pitch);
+          const roll = Cesium.Math.toDegrees(viewer.camera.roll);
+
+          // Hide/show property markers based on camera height
+          const heightThreshold = 2000; // meters
+          viewer.entities.values.forEach(entity => {
+            if (entity.name === 'Mount Albert Community' || entity.name === 'Mount Eden Community') {
+              // Always show community boundaries
+              entity.show = true;
+            } else {
+              // Hide property markers when camera is too high
+              entity.show = height < heightThreshold;
+            }
+          });
+
+          console.log('Camera Position:', {
+            destination: `Cesium.Cartesian3.fromDegrees(${longitude.toFixed(6)}, ${latitude.toFixed(6)}, ${height.toFixed(6)})`,
+            orientation: {
+              heading: `Cesium.Math.toRadians(${heading.toFixed(6)})`,
+              pitch: `Cesium.Math.toRadians(${pitch.toFixed(6)})`,
+              roll: `Cesium.Math.toRadians(${roll.toFixed(6)})`
+            }
+          });
+        });
+
         // Set up the geocoder
         const geocoder = viewer.geocoder;
         const osmBuildings = await Cesium.createOsmBuildingsAsync();
+        osmBuildingsRef.current = osmBuildings;
         viewer.scene.primitives.add(osmBuildings);
+
+        // Highlight OSM buildings with NFTs using distance-based color
+        const nftProperties = properties.filter((p: Property) => p.id !== undefined);
+        const defines: Record<string, string> = {};
+        const colorConditions: [string, string][] = [];
+        nftProperties.forEach((p, i) => {
+          const lng = p.longitude / 1_000_000;
+          const lat = p.latitude / 1_000_000;
+          defines[`dist${i}`] = `distance(vec2(\${feature['cesium#longitude']}, \${feature['cesium#latitude']}), vec2(${lng}, ${lat}))`;
+          colorConditions.push([`\${dist${i}} < 0.0001`, "color('#FFD600', 0.9)"]);
+        });
+        colorConditions.push(["true", "color('#ffffff', 0.8)"]);
+        osmBuildings.style = new Cesium.Cesium3DTileStyle({
+          defines,
+          color: { conditions: colorConditions }
+        });
+
+        // Add property markers
+        properties.forEach((property) => {
+          // Convert latitude and longitude from contract format (multiplied by 1000000)
+          const lat = property.latitude / 1000000;
+          const lng = property.longitude / 1000000;
+
+          const entity = viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(lng, lat),
+            billboard: {
+              image: property.isVerified ? "/verified-property.svg" : "/property.svg",
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+              scale: 0.5,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+            },
+            label: {
+              text: property.address,
+              font: "14px sans-serif",
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              outlineWidth: 2,
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+              pixelOffset: new Cesium.Cartesian2(0, -36),
+              fillColor: property.isVerified ? Cesium.Color.GREEN : Cesium.Color.WHITE,
+              outlineColor: Cesium.Color.BLACK,
+              showBackground: true,
+              backgroundColor: property.isVerified ? Cesium.Color.GREEN.withAlpha(0.7) : Cesium.Color.BLUE.withAlpha(0.7),
+              backgroundPadding: new Cesium.Cartesian2(7, 5),
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+            },
+            description: `
+              <div style="min-width: 250px;">
+                <h3 style="margin: 0 0 10px 0; color: #333; font-size: 16px; font-weight: 500;">${property.address}</h3>
+                <div style="margin-bottom: 10px; font-size: 14px; color: #444;">
+                  <p style="margin: 5px 0;"><strong>Owner:</strong> ${property.ownerName}</p>
+                  <p style="margin: 5px 0;"><strong>Type:</strong> ${property.propertyType}</p>
+                  <p style="margin: 5px 0;"><strong>Last Renovation:</strong> ${new Date(property.renovationDate * 1000).toLocaleDateString()}</p>
+                  <p style="margin: 5px 0;"><strong>Estimated Value:</strong> $${property.estimatedValue.toLocaleString()}</p>
+                  <p style="margin: 5px 0;"><strong>Status:</strong> ${property.isVerified ? 'Verified' : 'Pending Verification'}</p>
+                </div>
+                <button 
+                  onclick="window.location.href='${property.id !== undefined ? `/nft/${property.id}` : '/submit'}'"
+                  style="
+                    background-color: ${property.id !== undefined ? '#4CAF50' : '#2196F3'};
+                    color: white;
+                    padding: 8px 16px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    width: 100%;
+                    font-size: 14px;
+                    transition: background-color 0.2s;
+                  "
+                  onmouseover="this.style.backgroundColor='${property.id !== undefined ? '#388E3C' : '#1976D2'}'"
+                  onmouseout="this.style.backgroundColor='${property.id !== undefined ? '#4CAF50' : '#2196F3'}'"
+                >
+                  ${property.id !== undefined ? 'View NFT' : 'Create NFT'}
+                </button>
+              </div>
+            `,
+          });
+
+          // Add click handler for the entity
+          viewer.screenSpaceEventHandler.setInputAction((click: any) => {
+            const pickedObject = viewer.scene.pick(click.position);
+            if (Cesium.defined(pickedObject) && pickedObject.id === entity) {
+              setPopup({
+                position: { x: click.position.x, y: click.position.y },
+                content: entity.description?.getValue() || '',
+                streetViewPosition: { lat, lng }
+              });
+            }
+          }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+        });
 
         // Add click event handler for OSM buildings
         viewer.screenSpaceEventHandler.setInputAction(async (click: any) => {
@@ -245,7 +218,7 @@ export default function CesiumMap() {
               const latitude = Cesium.Math.toDegrees(cartographic.latitude);
               
               // Get building properties
-              const properties: Record<string, any> = {};
+              const buildingProperties: Record<string, any> = {};
               const commonProperties = [
                 'name',
                 'cesium#estimatedHeight',
@@ -273,7 +246,7 @@ export default function CesiumMap() {
                 try {
                   const value = pickedObject.getProperty(name);
                   if (value !== undefined) {
-                    properties[name] = value;
+                    buildingProperties[name] = value;
                   }
                 } catch (e) {
                   console.error(`Error getting value for property ${name}:`, e);
@@ -281,31 +254,31 @@ export default function CesiumMap() {
               });
 
               // Extract specific properties
-              const buildingName = properties['name'];
-              const buildingHeight = properties['cesium#estimatedHeight'] || properties['height'];
-              const buildingType = properties['building'];
-              const buildingOperator = properties['operator'];
-              const buildingTourism = properties['tourism'];
-              const buildingOpeningHours = properties['opening_hours'];
-              const buildingAccess = properties['access'];
-              const buildingDescription = properties['description'];
-              const buildingWikidata = properties['wikidata'];
-              const buildingRef = properties['ref'];
+              const buildingName = buildingProperties['name'];
+              const buildingHeight = buildingProperties['cesium#estimatedHeight'] || buildingProperties['height'];
+              const buildingType = buildingProperties['building'];
+              const buildingOperator = buildingProperties['operator'];
+              const buildingTourism = buildingProperties['tourism'];
+              const buildingOpeningHours = buildingProperties['opening_hours'];
+              const buildingAccess = buildingProperties['access'];
+              const buildingDescription = buildingProperties['description'];
+              const buildingWikidata = buildingProperties['wikidata'];
+              const buildingRef = buildingProperties['ref'];
 
               // Construct address string
               let addressString = '';
-              const fullAddress = properties['addr:full'];
+              const fullAddress = buildingProperties['addr:full'];
               if (fullAddress) {
                 addressString = fullAddress;
               } else {
                 const addressParts = [
-                  properties['addr:unit'],
-                  properties['addr:housenumber'],
-                  properties['addr:street'],
-                  properties['addr:suburb'],
-                  properties['addr:city'],
-                  properties['addr:postcode'],
-                  properties['addr:country']
+                  buildingProperties['addr:unit'],
+                  buildingProperties['addr:housenumber'],
+                  buildingProperties['addr:street'],
+                  buildingProperties['addr:suburb'],
+                  buildingProperties['addr:city'],
+                  buildingProperties['addr:postcode'],
+                  buildingProperties['addr:country']
                 ].filter(Boolean);
                 addressString = addressParts.join(', ');
               }
@@ -346,9 +319,22 @@ export default function CesiumMap() {
                       ${buildingRef ? `<p style="margin: 5px 0;"><strong>Reference:</strong> <a href="${buildingRef}" target="_blank" style="color: #2196F3; text-decoration: none;">Website</a></p>` : ''}
                     </div>
                     <button 
-                      onclick="window.location.href='/nft'"
+                      onclick="window.location.href='${(() => {
+                        // Check if there's a property at this location
+                        const existingProperty = properties.find((p: Property) => 
+                          Math.abs(p.latitude / 1000000 - latitude) < 0.0001 && 
+                          Math.abs(p.longitude / 1000000 - longitude) < 0.0001
+                        );
+                        return existingProperty?.id !== undefined ? `/nft/${existingProperty.id}` : '/submit';
+                      })()}'"
                       style="
-                        background-color: #2196F3;
+                        background-color: ${(() => {
+                          const existingProperty = properties.find((p: Property) => 
+                            Math.abs(p.latitude / 1000000 - latitude) < 0.0001 && 
+                            Math.abs(p.longitude / 1000000 - longitude) < 0.0001
+                          );
+                          return existingProperty?.id !== undefined ? '#4CAF50' : '#2196F3';
+                        })()};
                         color: white;
                         padding: 8px 16px;
                         border: none;
@@ -358,10 +344,28 @@ export default function CesiumMap() {
                         font-size: 14px;
                         transition: background-color 0.2s;
                       "
-                      onmouseover="this.style.backgroundColor='#1976D2'"
-                      onmouseout="this.style.backgroundColor='#2196F3'"
+                      onmouseover="this.style.backgroundColor='${(() => {
+                        const existingProperty = properties.find((p: Property) => 
+                          Math.abs(p.latitude / 1000000 - latitude) < 0.0001 && 
+                          Math.abs(p.longitude / 1000000 - longitude) < 0.0001
+                        );
+                        return existingProperty?.id !== undefined ? '#388E3C' : '#1976D2';
+                      })()}'"
+                      onmouseout="this.style.backgroundColor='${(() => {
+                        const existingProperty = properties.find((p: Property) => 
+                          Math.abs(p.latitude / 1000000 - latitude) < 0.0001 && 
+                          Math.abs(p.longitude / 1000000 - longitude) < 0.0001
+                        );
+                        return existingProperty?.id !== undefined ? '#4CAF50' : '#2196F3';
+                      })()}'"
                     >
-                      View NFT
+                      ${(() => {
+                        const existingProperty = properties.find((p: Property) => 
+                          Math.abs(p.latitude / 1000000 - latitude) < 0.0001 && 
+                          Math.abs(p.longitude / 1000000 - longitude) < 0.0001
+                        );
+                        return existingProperty?.id !== undefined ? 'View NFT' : 'Create NFT';
+                      })()}
                     </button>
                   </div>
                 `,
@@ -375,37 +379,32 @@ export default function CesiumMap() {
 
         // Set initial camera position (Auckland, New Zealand)
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(174.76463275594858, -36.91720833422622, 4660.218001334374),
+          destination: Cesium.Cartesian3.fromDegrees(174.760242, -36.892605, 348.458665),
           orientation: {
-            heading: Cesium.Math.toRadians(7.363795441494392),
-            pitch: Cesium.Math.toRadians(-37.0006208771684),
-            roll: Cesium.Math.toRadians(359.9968578532673),
+            heading: Cesium.Math.toRadians(324.680981),
+            pitch: Cesium.Math.toRadians(-21.222449),
+            roll: Cesium.Math.toRadians(359.999978),
           },
         });
 
         // Draw community boundary
         const communityBoundary = viewer.entities.add({
-          name: 'Ponsonby Community',
+          name: 'Mount Albert Community',
           polyline: {
             positions: Cesium.Cartesian3.fromDegreesArray([
-              174.7383, -36.8489,  // Start point
-              174.7423, -36.8479,  // Northeast
-              174.7483, -36.8489,  // East
-              174.7493, -36.8519,  // Southeast
-              174.7483, -36.8549,  // South
-              174.7453, -36.8589,  // Southwest
-              174.7383, -36.8589,  // West
-              174.7353, -36.8559,  // Northwest
-              174.7343, -36.8529,  // North
-              174.7363, -36.8499,  // North central
-              174.7383, -36.8489   // Back to start
+              174.7183, -36.8789,  // Start point
+              174.7227, -36.8789,  // Northeast
+              174.7227, -36.8842,  // Southeast
+              174.7205, -36.8852,  // South
+              174.7183, -36.8842,  // Southwest
+              174.7183, -36.8789   // Back to start
             ]),
             width: 3,
             material: Cesium.Color.DODGERBLUE,
             clampToGround: true
           },
           label: {
-            text: 'Ponsonby Community',
+            text: 'Mount Albert Community',
             font: '16px sans-serif',
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             outlineWidth: 2,
@@ -422,27 +421,22 @@ export default function CesiumMap() {
 
         // Draw Parnell community boundary
         const parnellBoundary = viewer.entities.add({
-          name: 'Parnell Community',
+          name: 'Mount Eden Community',
           polyline: {
             positions: Cesium.Cartesian3.fromDegreesArray([
-              174.7783, -36.8589,  // Start point
-              174.7823, -36.8579,  // Northeast
-              174.7883, -36.8589,  // East
-              174.7893, -36.8619,  // Southeast
-              174.7883, -36.8649,  // South
-              174.7853, -36.8689,  // Southwest
-              174.7783, -36.8689,  // West
-              174.7753, -36.8659,  // Northwest
-              174.7743, -36.8629,  // North
-              174.7763, -36.8599,  // North central
-              174.7783, -36.8589   // Back to start
+              174.7536, -36.8873,  // Start point
+              174.7576, -36.8873,  // Northeast
+              174.7576, -36.8893,  // Southeast
+              174.7556, -36.8903,  // South
+              174.7536, -36.8893,  // Southwest
+              174.7536, -36.8873   // Back to start
             ]),
             width: 3,
             material: Cesium.Color.RED,
             clampToGround: true
           },
           label: {
-            text: 'Parnell Community',
+            text: 'Mount Eden Community',
             font: '16px sans-serif',
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             outlineWidth: 2,
@@ -457,17 +451,6 @@ export default function CesiumMap() {
           }
         });
 
-        // Add a sample 3D building tileset
-        try {
-          // const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(96188) // San Francisco 3D buildings
-          // viewer.scene.primitives.add(tileset)
-
-          // // Add sample property markers
-          // addPropertyMarkers(Cesium, viewer)
-        } catch (error) {
-          console.error("Error loading 3D tileset:", error)
-        }
-
         // Cleanup function
         return () => {
           viewer.destroy()
@@ -478,44 +461,27 @@ export default function CesiumMap() {
     }
 
     loadCesium()
-  }, [])
+  }, [properties])
 
-  // Function to add property markers
-  const addPropertyMarkers = (Cesium: any, viewer: any) => {
-    // Sample property locations (Auckland)
-    const properties = [
-      { lon: -174.7633, lat: 36.8509, name: "Auckland CBD", value: "$2,500,000" },
-      { lon: -174.7683, lat: 36.8489, name: "Ponsonby", value: "$1,980,000" },
-      { lon: -174.7583, lat: 36.8529, name: "Newmarket", value: "$1,750,000" },
-      { lon: -174.7733, lat: 36.8469, name: "Grey Lynn", value: "$1,650,000" },
-      { lon: -174.7533, lat: 36.8549, name: "Remuera", value: "$2,800,000" },
-    ]
-
-    // Create entity for each property
-    properties.forEach((property) => {
-      viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(property.lon, property.lat),
-        billboard: {
-          image: "/placeholder.svg?height=32&width=32",
-          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          scale: 0.5,
-        },
-        label: {
-          text: property.name,
-          font: "14px sans-serif",
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineWidth: 2,
-          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          pixelOffset: new Cesium.Cartesian2(0, -36),
-        },
-        description: `
-          <h2>${property.name}</h2>
-          <p>Estimated Value: ${property.value}</p>
-          <button onclick="window.location.href='/nft'">View NFT</button>
-        `,
-      })
-    })
-  }
+  // Update OSM building style whenever properties change
+  useEffect(() => {
+    const osmBuildings = osmBuildingsRef.current;
+    if (!osmBuildings) return;
+    const nftProperties = properties.filter((p: Property) => p.id !== undefined);
+    const defines: Record<string, string> = {};
+    const colorConditions: [string, string][] = [];
+    nftProperties.forEach((p, i) => {
+      const lng = p.longitude / 1_000_000;
+      const lat = p.latitude / 1_000_000;
+      defines[`dist${i}`] = `distance(vec2(\${feature['cesium#longitude']}, \${feature['cesium#latitude']}), vec2(${lng}, ${lat}))`;
+      colorConditions.push([`\${dist${i}} < 0.0001`, "color('#FFD600', 0.9)"]);
+    });
+    colorConditions.push(["true", "color('#ffffff', 0.8)"]);
+    osmBuildings.style = new Cesium.Cesium3DTileStyle({
+      defines,
+      color: { conditions: colorConditions }
+    });
+  }, [properties]);
 
   return (
     <div style={{ position: 'relative' }}>

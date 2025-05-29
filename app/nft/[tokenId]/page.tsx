@@ -26,6 +26,21 @@ const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
 const VALUATION_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_VALUATION_ADDRESS || ""
 const ENS_REGISTRY = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
 
+const NZ_PROPERTY_TYPES = {
+  "HOUSE": "House",
+  "APARTMENT": "Apartment",
+  "TOWNHOUSE": "Townhouse",
+  "UNIT": "Unit",
+  "VILLA": "Villa",
+  "BUNGALOW": "Bungalow",
+  "TERRACE": "Terrace House",
+  "SECTION": "Section/Land",
+  "COMMERCIAL": "Commercial",
+  "RURAL": "Rural Property",
+  "LIFESTYLE": "Lifestyle Block",
+  "BACH": "Bach/Holiday Home"
+} as const
+
 interface PropertyData {
   address: string
   ownerName: string
@@ -35,6 +50,8 @@ interface PropertyData {
   isVerified: boolean
   estimatedValue: bigint
   owner: string
+  latitude: number
+  longitude: number
 }
 
 interface TransferDetails {
@@ -93,6 +110,8 @@ export default function NFTDetailPage() {
           isVerified: propertyData.isVerified || false,
           estimatedValue: propertyData.estimatedValue || BigInt(0),
           owner,
+          latitude: Number(propertyData.latitude || 0),
+          longitude: Number(propertyData.longitude || 0),
         })
       } catch (err) {
         console.error("Error fetching property data:", err)
@@ -235,6 +254,8 @@ export default function NFTDetailPage() {
         isVerified: propertyData.isVerified || false,
         estimatedValue: propertyData.estimatedValue || BigInt(0),
         owner: newOwner,
+        latitude: Number(propertyData.latitude || 0),
+        longitude: Number(propertyData.longitude || 0),
       })
     } catch (err) {
       console.error("Error transferring NFT:", err)
@@ -274,9 +295,23 @@ export default function NFTDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="space-y-6">
+        {/* Property Header */}
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Property NFT #{tokenId}</h1>
+          <p className="text-gray-600">{property.address}</p>
+          <div className="flex items-center gap-2 mt-2">
+            <Badge variant={property.isVerified ? "default" : "secondary"}>
+              {property.isVerified ? "Verified" : "Unverified"}
+            </Badge>
+            <Badge variant="outline">
+              {NZ_PROPERTY_TYPES[property.propertyType as keyof typeof NZ_PROPERTY_TYPES] || property.propertyType}
+            </Badge>
+          </div>
+        </div>
+
         {/* Property Image */}
-        <div className="relative aspect-square rounded-lg overflow-hidden">
+        <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100">
           {imageUrl ? (
             <img
               src={imageUrl}
@@ -291,190 +326,189 @@ export default function NFTDetailPage() {
         </div>
 
         {/* Property Details */}
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Property NFT #{tokenId}</h1>
-            <p className="text-gray-600">{property.address}</p>
-          </div>
+        <Tabs defaultValue="details" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="ownership">Ownership</TabsTrigger>
+            <TabsTrigger value="blockchain">Blockchain</TabsTrigger>
+          </TabsList>
 
-          <div className="flex items-center gap-2">
-            <Badge variant={property.isVerified ? "default" : "secondary"}>
-              {property.isVerified ? "Verified" : "Unverified"}
-            </Badge>
-            <Badge variant="outline">{property.propertyType}</Badge>
-          </div>
-
-          <Tabs defaultValue="details" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="ownership">Ownership</TabsTrigger>
-              <TabsTrigger value="blockchain">Blockchain</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="details">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Property Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold">Property Type</h3>
-                    <p className="text-gray-600">{property.propertyType}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Last Renovation</h3>
-                    <p className="text-gray-600">
-                      {new Date(property.renovationDate * 1000).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Estimated Value</h3>
-                    <p className="text-gray-600">
-                      {ethers.formatEther(property.estimatedValue.toString())} ETH
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="ownership">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Ownership Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold">Owner Name</h3>
-                    <p className="text-gray-600">{property.ownerName}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Owner Address</h3>
-                    <p className="text-gray-600 break-all">{property.owner}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="blockchain">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Blockchain Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold">Token ID</h3>
-                    <p className="text-gray-600">{tokenId}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Contract Address</h3>
-                    <p className="text-gray-600 break-all">{CONTRACT_ADDRESS}</p>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">Token URI</h3>
-                    <p className="text-gray-600 break-all">{property.tokenURI}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-
-          <div className="flex gap-4">
-            <Button variant="outline" className="flex-1">
-              <Share2 className="mr-2 h-4 w-4" />
-              Share
-            </Button>
-            <Dialog open={isTransferModalOpen} onOpenChange={setIsTransferModalOpen}>
-              <DialogTrigger asChild>
-                <Button className="flex-1">
-                  Transfer
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Transfer NFT</DialogTitle>
-                  <DialogDescription>
-                    Enter the recipient's Ethereum address or ENS name to transfer this NFT.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="address">Recipient Address or ENS Name</Label>
-                    <Input
-                      id="address"
-                      placeholder="0x... or name.eth"
-                      value={transferAddress}
-                      onChange={(e) => handleAddressChange(e.target.value)}
-                    />
-                  </div>
-
-                  {transferDetails && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Transfer Details</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <h3 className="font-semibold">Recipient</h3>
-                          <div className="flex items-center gap-2">
-                            <p className="text-gray-600 break-all">
-                              {transferDetails.isENS ? (
-                                <>
-                                  {transferDetails.ensName}
-                                  <span className="text-sm text-gray-400 ml-2">
-                                    ({transferDetails.recipient})
-                                  </span>
-                                </>
-                              ) : (
-                                transferDetails.recipient
-                              )}
-                            </p>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => window.open(`https://etherscan.io/address/${transferDetails.recipient}`, '_blank')}
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div>
-                          <h3 className="font-semibold">Estimated Gas Cost</h3>
-                          <p className="text-gray-600">{transferDetails.gasEstimate} ETH</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+          <TabsContent value="details">
+            <Card>
+              <CardHeader>
+                <CardTitle>Property Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="font-semibold">Property Type</h3>
+                  <p className="text-gray-600">
+                    {NZ_PROPERTY_TYPES[property.propertyType as keyof typeof NZ_PROPERTY_TYPES] || property.propertyType}
+                  </p>
                 </div>
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setIsTransferModalOpen(false)
-                      setTransferAddress("")
-                      setTransferDetails(null)
-                    }}
-                    disabled={isTransferring}
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={handleTransfer} 
-                    disabled={isTransferring || !transferDetails}
-                  >
-                    {isTransferring ? (
-                      <>
-                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                        Transferring...
-                      </>
-                    ) : (
-                      "Transfer"
-                    )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
+                <div>
+                  <h3 className="font-semibold">Last Renovation</h3>
+                  <p className="text-gray-600">
+                    {new Date(property.renovationDate * 1000).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Estimated Value</h3>
+                  <p className="text-gray-600">
+                    {ethers.formatEther(property.estimatedValue.toString())} ETH
+                  </p>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Coordinates</h3>
+                  <p className="text-gray-600">
+                    Latitude: {property.latitude / 1000000}°<br />
+                    Longitude: {property.longitude / 1000000}°
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="ownership">
+            <Card>
+              <CardHeader>
+                <CardTitle>Ownership Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="font-semibold">Owner Name</h3>
+                  <p className="text-gray-600">{property.ownerName}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Owner Address</h3>
+                  <p className="text-gray-600 break-all">{property.owner}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="blockchain">
+            <Card>
+              <CardHeader>
+                <CardTitle>Blockchain Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="font-semibold">Token ID</h3>
+                  <p className="text-gray-600">{tokenId}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Contract Address</h3>
+                  <p className="text-gray-600 break-all">{CONTRACT_ADDRESS}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold">Token URI</h3>
+                  <p className="text-gray-600 break-all">{property.tokenURI}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        <div className="flex gap-4">
+          <Button 
+            variant="outline" 
+            className="flex-1"
+            onClick={() => window.open(`https://sepolia.etherscan.io/address/${CONTRACT_ADDRESS}`, '_blank')}
+          >
+            <Share2 className="mr-2 h-4 w-4" />
+            Share Contract
+          </Button>
+          <Dialog open={isTransferModalOpen} onOpenChange={setIsTransferModalOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex-1">
+                Transfer
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Transfer NFT</DialogTitle>
+                <DialogDescription>
+                  Enter the recipient's Ethereum address or ENS name to transfer this NFT.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="address">Recipient Address or ENS Name</Label>
+                  <Input
+                    id="address"
+                    placeholder="0x... or name.eth"
+                    value={transferAddress}
+                    onChange={(e) => handleAddressChange(e.target.value)}
+                  />
+                </div>
+
+                {transferDetails && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Transfer Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <h3 className="font-semibold">Recipient</h3>
+                        <div className="flex items-center gap-2">
+                          <p className="text-gray-600 break-all">
+                            {transferDetails.isENS ? (
+                              <>
+                                {transferDetails.ensName}
+                                <span className="text-sm text-gray-400 ml-2">
+                                  ({transferDetails.recipient})
+                                </span>
+                              </>
+                            ) : (
+                              transferDetails.recipient
+                            )}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => window.open(`https://etherscan.io/address/${transferDetails.recipient}`, '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Estimated Gas Cost</h3>
+                        <p className="text-gray-600">{transferDetails.gasEstimate} ETH</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsTransferModalOpen(false)
+                    setTransferAddress("")
+                    setTransferDetails(null)
+                  }}
+                  disabled={isTransferring}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleTransfer} 
+                  disabled={isTransferring || !transferDetails}
+                >
+                  {isTransferring ? (
+                    <>
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Transferring...
+                    </>
+                  ) : (
+                    "Transfer"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

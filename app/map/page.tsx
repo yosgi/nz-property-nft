@@ -105,7 +105,16 @@ export default function MapPage() {
           <CardDescription>Explore properties in an interactive 3D environment powered by CesiumJS</CardDescription>
         </CardHeader>
         <CardContent className="p-0 pt-6">
-          {isClient && <CesiumMap />}
+          {isClient && (
+            isLoading ? (
+              <div className="w-full h-[600px] flex items-center justify-center bg-muted">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2">Loading property data...</span>
+              </div>
+            ) : (
+              <CesiumMap properties={properties} />
+            )
+          )}
         </CardContent>
       </Card>
 
@@ -138,11 +147,11 @@ export default function MapPage() {
             <div className="space-y-2">
               <div className="flex items-center">
                 <div className="w-4 h-4 rounded-full bg-blue-500 mr-2"></div>
-                <span className="text-sm">Ponsonby Community</span>
+                <span className="text-sm">Mount Albert Community</span>
               </div>
               <div className="flex items-center">
                 <div className="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
-                <span className="text-sm">Parnell Community</span>
+                <span className="text-sm">Mount Eden Community</span>
               </div>
               <div className="flex items-center">
                 <div className="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
