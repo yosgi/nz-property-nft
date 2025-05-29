@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const path = require('path');
+const CopyPlugin = require('copy-webpack-plugin');
 
 const nextConfig = {
   // Enable ESLint and TypeScript checks in production
@@ -47,6 +48,16 @@ const nextConfig = {
         console.error('Error configuring Cesium webpack plugin:', error);
       }
     }
+    config.plugins.push(
+      new CopyPlugin({
+        patterns: [
+          {
+            from: path.join(__dirname, 'build/contracts'),
+            to: path.join(__dirname, 'public/contracts'),
+          },
+        ],
+      })
+    );
     return config;
   },
 };

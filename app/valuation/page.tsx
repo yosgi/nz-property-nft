@@ -9,7 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertTriangle, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import contractArtifact from "../../build/contracts/PropertyNFT.json"
+import contractArtifact from "../../public/contracts/PropertyNFT.json"
 import valuationContractArtifact from "../../build/contracts/PropertyValuation.json"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"

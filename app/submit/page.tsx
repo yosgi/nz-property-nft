@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils"
 import { Loader } from "@googlemaps/js-api-loader"
 
 // Import the contract ABI
-import contractArtifact from "../../build/contracts/PropertyNFT.json"
+import contractArtifact from "../../public/contracts/PropertyNFT.json"
 
 // Add contract ABI and address
 const contractABI = contractArtifact.abi
