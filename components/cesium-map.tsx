@@ -1,8 +1,11 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
+import { LoadScript, GoogleMap, StreetViewPanorama, Libraries } from '@react-google-maps/api';
+
+const GOOGLE_MAPS_LIBRARIES: Libraries = ['places'];
 
 // Add Google Maps API types
 declare global {
@@ -15,6 +18,7 @@ interface PopupProps {
   position: { x: number; y: number };
   content: string;
   onClose: () => void;
+  streetViewPosition?: { lat: number; lng: number };
 }
 
 // Add reverse geocoding function
@@ -35,65 +39,175 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<stri
   }
 }
 
-function CustomPopup({ position, content, onClose }: PopupProps) {
+function CustomPopup({ position, content, onClose, streetViewPosition }: PopupProps) {
+  const mapContainerStyle = {
+    height: '200px',
+    width: '100%',
+  };
+  const streetViewRef = useRef<HTMLDivElement>(null);
+  const [panorama, setPanorama] = useState<google.maps.StreetViewPanorama | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isApiLoaded, setIsApiLoaded] = useState(false);
+
+  const initializeStreetView = useCallback(() => {
+    if (streetViewPosition && streetViewRef.current && isApiLoaded) {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const newPanorama = new google.maps.StreetViewPanorama(
+          streetViewRef.current,
+          {
+            position: streetViewPosition,
+            pov: {
+              heading: 210,
+              pitch: 10,
+            },
+            addressControl: false,
+            showRoadLabels: false,
+            zoomControl: false,
+            fullscreenControl: false,
+            scrollwheel: false,
+            panControl: false,
+            motionTracking: false,
+            motionTrackingControl: false,
+            enableCloseButton: false,
+          }
+        );
+
+        newPanorama.addListener('status_changed', () => {
+          if (newPanorama.getStatus() === google.maps.StreetViewStatus.OK) {
+            setIsLoading(false);
+          } else {
+            setError('No street view available at this location');
+            setIsLoading(false);
+          }
+        });
+
+        setPanorama(newPanorama);
+      } catch (err) {
+        setError('Failed to load street view');
+        setIsLoading(false);
+      }
+    }
+  }, [streetViewPosition, isApiLoaded]);
+
+  useEffect(() => {
+    initializeStreetView();
+  }, [initializeStreetView]);
+
   return (
-    <div
-      style={{
-        position: 'absolute',
-        right: '20px',
-        top: '20px',
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        padding: '15px',
-        borderRadius: '8px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-        zIndex: 1000,
-        maxWidth: '300px',
-        backdropFilter: 'blur(5px)',
-        border: '1px solid rgba(255, 255, 255, 0.3)',
-      }}
+    <LoadScript
+      googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string}
+      libraries={GOOGLE_MAPS_LIBRARIES}
+      onLoad={() => setIsApiLoaded(true)}
     >
-      <div dangerouslySetInnerHTML={{ __html: content }} />
-      <button
-        onClick={onClose}
+      <div
         style={{
           position: 'absolute',
-          top: '8px',
-          right: '8px',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: '#666',
-          fontSize: '16px',
-          padding: '4px',
-          lineHeight: '1',
-          borderRadius: '50%',
-          width: '24px',
-          height: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'background-color 0.2s',
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent';
+          right: '20px',
+          top: '20px',
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          padding: '15px',
+          borderRadius: '8px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+          zIndex: 1000,
+          maxWidth: '300px',
+          backdropFilter: 'blur(5px)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
         }}
       >
-        ×
-      </button>
-    </div>
+        <div dangerouslySetInnerHTML={{ __html: content }} />
+        {streetViewPosition && (
+          <div 
+            ref={streetViewRef}
+            style={{ 
+              marginTop: '15px', 
+              borderRadius: '8px', 
+              overflow: 'hidden',
+              height: '200px',
+              width: '100%',
+              position: 'relative'
+            }}
+          >
+            {isLoading && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                zIndex: 1
+              }}>
+                Loading street view...
+              </div>
+            )}
+            {error && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                color: '#666',
+                zIndex: 1
+              }}>
+                {error}
+              </div>
+            )}
+          </div>
+        )}
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: '#666',
+            fontSize: '16px',
+            padding: '4px',
+            lineHeight: '1',
+            borderRadius: '50%',
+            width: '24px',
+            height: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background-color 0.2s',
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+        >
+          ×
+        </button>
+      </div>
+    </LoadScript>
   );
 }
 
+
 export default function CesiumMap() {
   const cesiumContainerRef = useRef<HTMLDivElement>(null)
-  const [popup, setPopup] = useState<{ position: { x: number; y: number }; content: string } | null>(null);
+  const [popup, setPopup] = useState<{ position: { x: number; y: number }; content: string; streetViewPosition?: { lat: number; lng: number } } | null>(null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 
   useEffect(() => {
-    // Dynamic import of Cesium modules
     const loadCesium = async () => {
       try {
         // Initialize Cesium ion with your access token
@@ -115,37 +229,26 @@ export default function CesiumMap() {
 
         // Set up the geocoder
         const geocoder = viewer.geocoder;
-        // geocoder.viewModel.searchText = "Auckland, New Zealand";
-        // (geocoder.viewModel as any).search();
         const osmBuildings = await Cesium.createOsmBuildingsAsync();
         viewer.scene.primitives.add(osmBuildings);
 
         // Add click event handler for OSM buildings
         viewer.screenSpaceEventHandler.setInputAction(async (click: any) => {
-          console.log('Click detected');
           const pickedObject = viewer.scene.pick(click.position);
-          console.log('Picked object:', pickedObject);
           
-          // Check if we clicked on a building
           if (Cesium.defined(pickedObject) && pickedObject instanceof Cesium.Cesium3DTileFeature) {
-            console.log('Object picked, checking if it is a building');
             const cartesian = viewer.scene.pickPosition(click.position);
-            console.log('Cartesian position:', cartesian);
             
             if (cartesian) {
               const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
               const longitude = Cesium.Math.toDegrees(cartographic.longitude);
               const latitude = Cesium.Math.toDegrees(cartographic.latitude);
               
-              // Get building properties using feature properties
+              // Get building properties
               const properties: Record<string, any> = {};
-              
-              // Common OSM building properties
               const commonProperties = [
                 'name',
                 'cesium#estimatedHeight',
-                'cesium#longitude',
-                'cesium#latitude',
                 'building',
                 'opening_hours',
                 'operator',
@@ -155,8 +258,6 @@ export default function CesiumMap() {
                 'access',
                 'description',
                 'height',
-                'building:part',
-                // Address related properties
                 'addr:street',
                 'addr:housenumber',
                 'addr:postcode',
@@ -172,17 +273,14 @@ export default function CesiumMap() {
                 try {
                   const value = pickedObject.getProperty(name);
                   if (value !== undefined) {
-                    console.log(`Property ${name}:`, value);
                     properties[name] = value;
                   }
                 } catch (e) {
                   console.error(`Error getting value for property ${name}:`, e);
                 }
               });
-              
-              console.log('All building properties:', properties);
 
-              // Extract specific properties using documented property names
+              // Extract specific properties
               const buildingName = properties['name'];
               const buildingHeight = properties['cesium#estimatedHeight'] || properties['height'];
               const buildingType = properties['building'];
@@ -194,30 +292,20 @@ export default function CesiumMap() {
               const buildingWikidata = properties['wikidata'];
               const buildingRef = properties['ref'];
 
-              // Address properties
-              const street = properties['addr:street'];
-              const houseNumber = properties['addr:housenumber'];
-              const postcode = properties['addr:postcode'];
-              const city = properties['addr:city'];
-              const country = properties['addr:country'];
-              const suburb = properties['addr:suburb'];
-              const unit = properties['addr:unit'];
-              const floor = properties['addr:floor'];
-              const fullAddress = properties['addr:full'];
-
               // Construct address string
               let addressString = '';
+              const fullAddress = properties['addr:full'];
               if (fullAddress) {
                 addressString = fullAddress;
               } else {
                 const addressParts = [
-                  unit && `${unit}`,
-                  houseNumber && `${houseNumber}`,
-                  street && `${street}`,
-                  suburb && `${suburb}`,
-                  city && `${city}`,
-                  postcode && `${postcode}`,
-                  country && `${country}`
+                  properties['addr:unit'],
+                  properties['addr:housenumber'],
+                  properties['addr:street'],
+                  properties['addr:suburb'],
+                  properties['addr:city'],
+                  properties['addr:postcode'],
+                  properties['addr:country']
                 ].filter(Boolean);
                 addressString = addressParts.join(', ');
               }
@@ -227,7 +315,6 @@ export default function CesiumMap() {
                 setIsLoadingAddress(true);
                 try {
                   const googleAddress = await reverseGeocode(latitude, longitude);
-                  console.log('Google address:', googleAddress);
                   if (googleAddress) {
                     addressString = googleAddress;
                   }
@@ -237,62 +324,51 @@ export default function CesiumMap() {
                   setIsLoadingAddress(false);
                 }
               }
-              
-              // Convert cartesian to screen coordinates
-              const screenPosition = Cesium.SceneTransforms.worldToWindowCoordinates(
-                viewer.scene,
-                cartesian
-              );
 
-              if (screenPosition) {
-                // Show custom popup with enhanced information
-                setPopup({
-                  position: {
-                    x: 0, // Not used anymore since we fixed the position
-                    y: 0, // Not used anymore since we fixed the position
-                  },
-                  content: `
-                    <div style="min-width: 250px;">
-                      <h3 style="margin: 0 0 10px 0; color: #333; font-size: 16px; font-weight: 500;">${buildingName || 'Building Information'}</h3>
-                      <div style="margin-bottom: 10px; font-size: 14px; color: #444;">
-                        <p style="margin: 5px 0;"><strong>Location:</strong> ${longitude.toFixed(4)}°, ${latitude.toFixed(4)}°</p>
-                        ${addressString ? `<p style="margin: 5px 0;"><strong>Address:</strong> ${addressString}</p>` : ''}
-                        ${isLoadingAddress ? `<p style="margin: 5px 0;"><em>Loading address...</em></p>` : ''}
-                        ${buildingType ? `<p style="margin: 5px 0;"><strong>Type:</strong> ${buildingType}</p>` : ''}
-                        ${buildingOperator ? `<p style="margin: 5px 0;"><strong>Operator:</strong> ${buildingOperator}</p>` : ''}
-                        ${buildingTourism ? `<p style="margin: 5px 0;"><strong>Tourism Type:</strong> ${buildingTourism}</p>` : ''}
-                        ${buildingHeight ? `<p style="margin: 5px 0;"><strong>Height:</strong> ${buildingHeight}m</p>` : ''}
-                        ${buildingOpeningHours ? `<p style="margin: 5px 0;"><strong>Opening Hours:</strong> ${buildingOpeningHours}</p>` : ''}
-                        ${buildingAccess ? `<p style="margin: 5px 0;"><strong>Access:</strong> ${buildingAccess}</p>` : ''}
-                        ${buildingDescription ? `<p style="margin: 5px 0;"><strong>Description:</strong> ${buildingDescription}</p>` : ''}
-                        ${buildingWikidata ? `<p style="margin: 5px 0;"><strong>Wikidata:</strong> <a href="https://www.wikidata.org/wiki/${buildingWikidata}" target="_blank" style="color: #2196F3; text-decoration: none;">${buildingWikidata}</a></p>` : ''}
-                        ${buildingRef ? `<p style="margin: 5px 0;"><strong>Reference:</strong> <a href="${buildingRef}" target="_blank" style="color: #2196F3; text-decoration: none;">Website</a></p>` : ''}
-                      </div>
-                      <button 
-                        onclick="window.location.href='/nft'"
-                        style="
-                          background-color: #2196F3;
-                          color: white;
-                          padding: 8px 16px;
-                          border: none;
-                          border-radius: 4px;
-                          cursor: pointer;
-                          width: 100%;
-                          font-size: 14px;
-                          transition: background-color 0.2s;
-                        "
-                        onmouseover="this.style.backgroundColor='#1976D2'"
-                        onmouseout="this.style.backgroundColor='#2196F3'"
-                      >
-                        View NFT
-                      </button>
+              // Show popup with Street View
+              setPopup({
+                position: { x: 0, y: 0 },
+                content: `
+                  <div style="min-width: 250px;">
+                    <h3 style="margin: 0 0 10px 0; color: #333; font-size: 16px; font-weight: 500;">${buildingName || 'Building Information'}</h3>
+                    <div style="margin-bottom: 10px; font-size: 14px; color: #444;">
+                      <p style="margin: 5px 0;"><strong>Location:</strong> ${longitude.toFixed(4)}°, ${latitude.toFixed(4)}°</p>
+                      ${addressString ? `<p style="margin: 5px 0;"><strong>Address:</strong> ${addressString}</p>` : ''}
+                      ${isLoadingAddress ? `<p style="margin: 5px 0;"><em>Loading address...</em></p>` : ''}
+                      ${buildingType ? `<p style="margin: 5px 0;"><strong>Type:</strong> ${buildingType}</p>` : ''}
+                      ${buildingOperator ? `<p style="margin: 5px 0;"><strong>Operator:</strong> ${buildingOperator}</p>` : ''}
+                      ${buildingTourism ? `<p style="margin: 5px 0;"><strong>Tourism Type:</strong> ${buildingTourism}</p>` : ''}
+                      ${buildingHeight ? `<p style="margin: 5px 0;"><strong>Height:</strong> ${buildingHeight}m</p>` : ''}
+                      ${buildingOpeningHours ? `<p style="margin: 5px 0;"><strong>Opening Hours:</strong> ${buildingOpeningHours}</p>` : ''}
+                      ${buildingAccess ? `<p style="margin: 5px 0;"><strong>Access:</strong> ${buildingAccess}</p>` : ''}
+                      ${buildingDescription ? `<p style="margin: 5px 0;"><strong>Description:</strong> ${buildingDescription}</p>` : ''}
+                      ${buildingWikidata ? `<p style="margin: 5px 0;"><strong>Wikidata:</strong> <a href="https://www.wikidata.org/wiki/${buildingWikidata}" target="_blank" style="color: #2196F3; text-decoration: none;">${buildingWikidata}</a></p>` : ''}
+                      ${buildingRef ? `<p style="margin: 5px 0;"><strong>Reference:</strong> <a href="${buildingRef}" target="_blank" style="color: #2196F3; text-decoration: none;">Website</a></p>` : ''}
                     </div>
-                  `,
-                });
-              }
+                    <button 
+                      onclick="window.location.href='/nft'"
+                      style="
+                        background-color: #2196F3;
+                        color: white;
+                        padding: 8px 16px;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        width: 100%;
+                        font-size: 14px;
+                        transition: background-color 0.2s;
+                      "
+                      onmouseover="this.style.backgroundColor='#1976D2'"
+                      onmouseout="this.style.backgroundColor='#2196F3'"
+                    >
+                      View NFT
+                    </button>
+                  </div>
+                `,
+                streetViewPosition: { lat: latitude, lng: longitude }
+              });
             }
           } else {
-            console.log('No object picked, closing popup');
             setPopup(null);
           }
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -305,7 +381,7 @@ export default function CesiumMap() {
             pitch: Cesium.Math.toRadians(-37.0006208771684),
             roll: Cesium.Math.toRadians(359.9968578532673),
           },
-        })
+        });
 
         // Draw community boundary
         const communityBoundary = viewer.entities.add({
@@ -449,6 +525,7 @@ export default function CesiumMap() {
           position={popup.position}
           content={popup.content}
           onClose={() => setPopup(null)}
+          streetViewPosition={popup.streetViewPosition}
         />
       )}
     </div>
