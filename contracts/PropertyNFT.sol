@@ -19,9 +19,11 @@ contract PropertyNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
         string ownerName;
         string propertyType;
         uint256 renovationDate;
-        uint256 submissionDate;
-        uint256 estimatedValue;
+        string imageURI;
+        int256 latitude;
+        int256 longitude;
         bool isVerified;
+        uint256 estimatedValue;
         uint256 verificationVotes;
         uint256 rejectionVotes;
         mapping(address => bool) hasVoted;
@@ -58,7 +60,9 @@ contract PropertyNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
         string memory _ownerName,
         string memory _propertyType,
         uint256 _renovationDate,
-        string memory _tokenURI
+        string memory _imageURI,
+        int256 _latitude,
+        int256 _longitude
     ) public returns (uint256) {
         require(bytes(_propertyAddress).length > 0, "Property address cannot be empty");
         require(bytes(_ownerName).length > 0, "Owner name cannot be empty");
@@ -69,7 +73,7 @@ contract PropertyNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
         
         // Mint NFT to the submitter
         _safeMint(msg.sender, tokenId);
-        _setTokenURI(tokenId, _tokenURI);
+        _setTokenURI(tokenId, _imageURI);
         
         // Create property record
         Property storage newProperty = properties[tokenId];
@@ -77,9 +81,11 @@ contract PropertyNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
         newProperty.ownerName = _ownerName;
         newProperty.propertyType = _propertyType;
         newProperty.renovationDate = _renovationDate;
-        newProperty.submissionDate = block.timestamp;
-        newProperty.estimatedValue = 0;
+        newProperty.imageURI = _imageURI;
+        newProperty.latitude = _latitude;
+        newProperty.longitude = _longitude;
         newProperty.isVerified = false;
+        newProperty.estimatedValue = 0;
         newProperty.verificationVotes = 0;
         newProperty.rejectionVotes = 0;
         
@@ -145,9 +151,11 @@ contract PropertyNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
         string memory ownerName,
         string memory propertyType,
         uint256 renovationDate,
-        uint256 submissionDate,
-        uint256 estimatedValue,
+        string memory imageURI,
+        int256 latitude,
+        int256 longitude,
         bool isVerified,
+        uint256 estimatedValue,
         uint256 verificationVotes,
         uint256 rejectionVotes
     ) {
@@ -159,9 +167,11 @@ contract PropertyNFT is ERC721, ERC721URIStorage, Ownable, ReentrancyGuard {
             property.ownerName,
             property.propertyType,
             property.renovationDate,
-            property.submissionDate,
-            property.estimatedValue,
+            property.imageURI,
+            property.latitude,
+            property.longitude,
             property.isVerified,
+            property.estimatedValue,
             property.verificationVotes,
             property.rejectionVotes
         );

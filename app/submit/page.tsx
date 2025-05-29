@@ -2,7 +2,7 @@
 
 import type React from "react"
 import type { EthereumProvider } from "../types/ethereum"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ethers } from "ethers"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,6 +14,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { Loader } from "@googlemaps/js-api-loader"
 
 // Import the contract ABI
 import contractArtifact from "../../build/contracts/PropertyNFT.json"
@@ -22,6 +23,9 @@ import contractArtifact from "../../build/contracts/PropertyNFT.json"
 const contractABI = contractArtifact.abi
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
 
+// Add Google Maps API key
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""
+
 export default function SubmitPage() {
   const [formData, setFormData] = useState({
     address: "",
@@ -29,6 +33,8 @@ export default function SubmitPage() {
     renovationDate: undefined as Date | undefined,
     propertyType: "",
     image: null as File | null,
+    latitude: "",
+    longitude: "",
   })
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -40,7 +46,48 @@ export default function SubmitPage() {
     renovationDate?: string;
     propertyType?: string;
     image?: string;
+    latitude?: string;
+    longitude?: string;
   }>({})
+
+  useEffect(() => {
+    // Initialize Google Places Autocomplete
+    const initGooglePlaces = async () => {
+      const loader = new Loader({
+        apiKey: GOOGLE_MAPS_API_KEY,
+        version: "weekly",
+        libraries: ["places"]
+      })
+
+      try {
+        const google = await loader.load()
+        const input = document.getElementById("address") as HTMLInputElement
+        if (input) {
+          const autocomplete = new google.maps.places.Autocomplete(input, {
+            types: ["address"],
+            fields: ["formatted_address", "geometry"]
+          })
+
+          autocomplete.addListener("place_changed", () => {
+            const place = autocomplete.getPlace()
+            if (place.geometry?.location) {
+              const geometry = place.geometry
+              setFormData(prev => ({
+                ...prev,
+                address: place.formatted_address || "",
+                latitude: geometry.location!.lat().toString(),
+                longitude: geometry.location!.lng().toString()
+              }))
+            }
+          })
+        }
+      } catch (error) {
+        console.error("Error loading Google Places:", error)
+      }
+    }
+
+    initGooglePlaces()
+  }, [])
 
   const validateForm = () => {
     const errors: {
@@ -49,6 +96,8 @@ export default function SubmitPage() {
       renovationDate?: string;
       propertyType?: string;
       image?: string;
+      latitude?: string;
+      longitude?: string;
     } = {}
 
     if (!formData.address.trim()) {
@@ -65,6 +114,22 @@ export default function SubmitPage() {
     }
     if (!formData.image) {
       errors.image = "Property image is required"
+    }
+    if (!formData.latitude.trim()) {
+      errors.latitude = "Latitude is required"
+    } else {
+      const lat = parseFloat(formData.latitude)
+      if (isNaN(lat) || lat < -90 || lat > 90) {
+        errors.latitude = "Latitude must be between -90 and 90"
+      }
+    }
+    if (!formData.longitude.trim()) {
+      errors.longitude = "Longitude is required"
+    } else {
+      const lng = parseFloat(formData.longitude)
+      if (isNaN(lng) || lng < -180 || lng > 180) {
+        errors.longitude = "Longitude must be between -180 and 180"
+      }
     }
 
     setValidationErrors(errors)
@@ -157,13 +222,19 @@ export default function SubmitPage() {
         ? Math.floor(formData.renovationDate.getTime() / 1000)
         : Math.floor(Date.now() / 1000)
 
+      // Convert latitude and longitude to integers (multiply by 1000000)
+      const latitude = Math.floor(parseFloat(formData.latitude) * 1000000)
+      const longitude = Math.floor(parseFloat(formData.longitude) * 1000000)
+
       // Submit the property
       const tx = await contract.submitProperty(
         formData.address,
         formData.ownerName,
         formData.propertyType,
         renovationTimestamp,
-        imageURI
+        imageURI,
+        latitude,
+        longitude
       )
 
       // Wait for transaction to be mined
@@ -250,7 +321,7 @@ export default function SubmitPage() {
               <Input
                 id="address"
                 name="address"
-                placeholder="123 Main St, City, State, ZIP"
+                placeholder="Start typing an address..."
                 value={formData.address}
                 onChange={handleInputChange}
                 required

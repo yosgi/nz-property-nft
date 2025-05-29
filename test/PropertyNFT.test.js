@@ -19,6 +19,8 @@ contract("PropertyNFT", (accounts) => {
         "Single Family Home",
         1672531200, // Jan 1, 2023
         "https://example.com/metadata/1",
+        -36917208, // latitude * 1000000
+        174764632, // longitude * 1000000
         { from: user1 },
       )
 
@@ -36,6 +38,8 @@ contract("PropertyNFT", (accounts) => {
         "Single Family Home",
         1672531200,
         "https://example.com/metadata/1",
+        -36917208, // latitude * 1000000
+        174764632, // longitude * 1000000
         { from: user1 },
       )
 
@@ -46,6 +50,8 @@ contract("PropertyNFT", (accounts) => {
           "Condo",
           1672531200,
           "https://example.com/metadata/2",
+          -36917208, // latitude * 1000000
+          174764632, // longitude * 1000000
           { from: user2 },
         )
         assert.fail("Should have thrown an error")
@@ -63,6 +69,8 @@ contract("PropertyNFT", (accounts) => {
         "Single Family Home",
         1672531200,
         "https://example.com/metadata/1",
+        -36917208, // latitude * 1000000
+        174764632, // longitude * 1000000
         { from: user1 },
       )
     })
@@ -148,6 +156,8 @@ contract("PropertyNFT", (accounts) => {
         "Single Family Home",
         1672531200,
         "https://example.com/metadata/1",
+        -36917208, // latitude * 1000000
+        174764632, // longitude * 1000000
         { from: user1 },
       )
     })
@@ -158,8 +168,14 @@ contract("PropertyNFT", (accounts) => {
       assert.equal(property.propertyAddress, "123 Blockchain Ave, Crypto City")
       assert.equal(property.ownerName, "John Doe")
       assert.equal(property.propertyType, "Single Family Home")
-      assert.equal(property.renovationDate, 1672531200)
+      assert.equal(property.renovationDate.toString(), "1672531200")
+      assert.equal(property.imageURI, "https://example.com/metadata/1")
+      assert.equal(property.latitude.toString(), "-36917208")
+      assert.equal(property.longitude.toString(), "174764632")
       assert.equal(property.isVerified, false)
+      assert.equal(property.estimatedValue.toString(), "0")
+      assert.equal(property.verificationVotes.toString(), "0")
+      assert.equal(property.rejectionVotes.toString(), "0")
     })
 
     it("should return owner properties", async () => {
@@ -169,6 +185,8 @@ contract("PropertyNFT", (accounts) => {
         "Condo",
         1672531200,
         "https://example.com/metadata/2",
+        -36917208, // latitude * 1000000
+        174764632, // longitude * 1000000
         { from: user1 },
       )
 
@@ -187,6 +205,8 @@ contract("PropertyNFT", (accounts) => {
         "Single Family Home",
         1672531200,
         "https://example.com/metadata/1",
+        -36917208, // latitude * 1000000
+        174764632, // longitude * 1000000
         { from: user1 },
       )
       // Set the valuation contract as the owner of the NFT contract

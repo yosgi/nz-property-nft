@@ -5,14 +5,14 @@ module.exports = {
     networks: {
       development: {
         host: "127.0.0.1", // Localhost (default: none)
-        port: 8545, // Standard Ganache port (default: none)
-        network_id: "1337", // Any network (default: none)
+        port: 7545, // Standard Ganache port (default: none)
+        network_id: "*", // Any network (default: none)
         gas: 6721975, // Gas limit
         gasPrice: 20000000000, // 20 gwei (in wei)
       },
       ganache: {
         host: "127.0.0.1",
-        port: 8545, // Standard Ganache CLI port
+        port: 7545, // Standard Ganache CLI port
         network_id: "*",
         gas: 6721975,
         gasPrice: 20000000000,
