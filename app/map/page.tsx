@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import dynamic from "next/dynamic"
 import { ethers } from "ethers"
-import contractArtifact from "../../build/contracts/PropertyNFT.json"
+import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
+import { PlusCircle, ExternalLink } from "lucide-react"
+import contractArtifact from "../../public/contracts/PropertyNFT.json"
 
 // Dynamically import the CesiumMap component with no SSR
 const CesiumMap = dynamic(() => import("@/components/cesium-map"), {

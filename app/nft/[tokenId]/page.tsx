@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { ethers } from "ethers"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import Link from "next/link"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Share2, ArrowRight, ExternalLink } from "lucide-react"
+import { Share2, ArrowRight, ExternalLink, PlusCircle } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import contractArtifact from "../../../build/contracts/PropertyNFT.json"
+import contractArtifact from "../../../public/contracts/PropertyNFT.json"
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
 const VALUATION_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_VALUATION_ADDRESS || ""
