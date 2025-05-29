@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { PlusCircle, ExternalLink } from "lucide-react"
-import contractArtifact from "../../public/contracts/PropertyNFT.json"
+import contractArtifact from "../../build/contracts/PropertyNFT.json"
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
 
