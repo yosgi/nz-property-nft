@@ -1,10 +1,96 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import * as Cesium from "cesium";
+
+// Add Google Maps API types
+declare global {
+  interface Window {
+    google: any;
+  }
+}
+
+interface PopupProps {
+  position: { x: number; y: number };
+  content: string;
+  onClose: () => void;
+}
+
+// Add reverse geocoding function
+async function reverseGeocode(latitude: number, longitude: number): Promise<string> {
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`
+    );
+    const data = await response.json();
+    
+    if (data.status === 'OK' && data.results.length > 0) {
+      return data.results[0].formatted_address;
+    }
+    return '';
+  } catch (error) {
+    console.error('Error in reverse geocoding:', error);
+    return '';
+  }
+}
+
+function CustomPopup({ position, content, onClose }: PopupProps) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        right: '20px',
+        top: '20px',
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        padding: '15px',
+        borderRadius: '8px',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+        zIndex: 1000,
+        maxWidth: '300px',
+        backdropFilter: 'blur(5px)',
+        border: '1px solid rgba(255, 255, 255, 0.3)',
+      }}
+    >
+      <div dangerouslySetInnerHTML={{ __html: content }} />
+      <button
+        onClick={onClose}
+        style={{
+          position: 'absolute',
+          top: '8px',
+          right: '8px',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          color: '#666',
+          fontSize: '16px',
+          padding: '4px',
+          lineHeight: '1',
+          borderRadius: '50%',
+          width: '24px',
+          height: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'background-color 0.2s',
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 export default function CesiumMap() {
   const cesiumContainerRef = useRef<HTMLDivElement>(null)
+  const [popup, setPopup] = useState<{ position: { x: number; y: number }; content: string } | null>(null);
+  const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 
   useEffect(() => {
     // Dynamic import of Cesium modules
@@ -24,14 +110,192 @@ export default function CesiumMap() {
           sceneModePicker: true,
           timeline: false,
           animation: false,
+          infoBox: true, // Disable default InfoBox
         })
 
         // Set up the geocoder
         const geocoder = viewer.geocoder;
         // geocoder.viewModel.searchText = "Auckland, New Zealand";
         // (geocoder.viewModel as any).search();
-        const osmBuildings= await Cesium.createOsmBuildingsAsync();
+        const osmBuildings = await Cesium.createOsmBuildingsAsync();
         viewer.scene.primitives.add(osmBuildings);
+
+        // Add click event handler for OSM buildings
+        viewer.screenSpaceEventHandler.setInputAction(async (click: any) => {
+          console.log('Click detected');
+          const pickedObject = viewer.scene.pick(click.position);
+          console.log('Picked object:', pickedObject);
+          
+          // Check if we clicked on a building
+          if (Cesium.defined(pickedObject) && pickedObject instanceof Cesium.Cesium3DTileFeature) {
+            console.log('Object picked, checking if it is a building');
+            const cartesian = viewer.scene.pickPosition(click.position);
+            console.log('Cartesian position:', cartesian);
+            
+            if (cartesian) {
+              const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+              const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+              const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+              
+              // Get building properties using feature properties
+              const properties: Record<string, any> = {};
+              
+              // Common OSM building properties
+              const commonProperties = [
+                'name',
+                'cesium#estimatedHeight',
+                'cesium#longitude',
+                'cesium#latitude',
+                'building',
+                'opening_hours',
+                'operator',
+                'tourism',
+                'wikidata',
+                'ref',
+                'access',
+                'description',
+                'height',
+                'building:part',
+                // Address related properties
+                'addr:street',
+                'addr:housenumber',
+                'addr:postcode',
+                'addr:city',
+                'addr:country',
+                'addr:suburb',
+                'addr:unit',
+                'addr:floor',
+                'addr:full'
+              ];
+
+              commonProperties.forEach(name => {
+                try {
+                  const value = pickedObject.getProperty(name);
+                  if (value !== undefined) {
+                    console.log(`Property ${name}:`, value);
+                    properties[name] = value;
+                  }
+                } catch (e) {
+                  console.error(`Error getting value for property ${name}:`, e);
+                }
+              });
+              
+              console.log('All building properties:', properties);
+
+              // Extract specific properties using documented property names
+              const buildingName = properties['name'];
+              const buildingHeight = properties['cesium#estimatedHeight'] || properties['height'];
+              const buildingType = properties['building'];
+              const buildingOperator = properties['operator'];
+              const buildingTourism = properties['tourism'];
+              const buildingOpeningHours = properties['opening_hours'];
+              const buildingAccess = properties['access'];
+              const buildingDescription = properties['description'];
+              const buildingWikidata = properties['wikidata'];
+              const buildingRef = properties['ref'];
+
+              // Address properties
+              const street = properties['addr:street'];
+              const houseNumber = properties['addr:housenumber'];
+              const postcode = properties['addr:postcode'];
+              const city = properties['addr:city'];
+              const country = properties['addr:country'];
+              const suburb = properties['addr:suburb'];
+              const unit = properties['addr:unit'];
+              const floor = properties['addr:floor'];
+              const fullAddress = properties['addr:full'];
+
+              // Construct address string
+              let addressString = '';
+              if (fullAddress) {
+                addressString = fullAddress;
+              } else {
+                const addressParts = [
+                  unit && `${unit}`,
+                  houseNumber && `${houseNumber}`,
+                  street && `${street}`,
+                  suburb && `${suburb}`,
+                  city && `${city}`,
+                  postcode && `${postcode}`,
+                  country && `${country}`
+                ].filter(Boolean);
+                addressString = addressParts.join(', ');
+              }
+
+              // If no address from OSM, try Google Maps reverse geocoding
+              if (!addressString) {
+                setIsLoadingAddress(true);
+                try {
+                  const googleAddress = await reverseGeocode(latitude, longitude);
+                  console.log('Google address:', googleAddress);
+                  if (googleAddress) {
+                    addressString = googleAddress;
+                  }
+                } catch (error) {
+                  console.error('Error getting address from Google Maps:', error);
+                } finally {
+                  setIsLoadingAddress(false);
+                }
+              }
+              
+              // Convert cartesian to screen coordinates
+              const screenPosition = Cesium.SceneTransforms.worldToWindowCoordinates(
+                viewer.scene,
+                cartesian
+              );
+
+              if (screenPosition) {
+                // Show custom popup with enhanced information
+                setPopup({
+                  position: {
+                    x: 0, // Not used anymore since we fixed the position
+                    y: 0, // Not used anymore since we fixed the position
+                  },
+                  content: `
+                    <div style="min-width: 250px;">
+                      <h3 style="margin: 0 0 10px 0; color: #333; font-size: 16px; font-weight: 500;">${buildingName || 'Building Information'}</h3>
+                      <div style="margin-bottom: 10px; font-size: 14px; color: #444;">
+                        <p style="margin: 5px 0;"><strong>Location:</strong> ${longitude.toFixed(4)}°, ${latitude.toFixed(4)}°</p>
+                        ${addressString ? `<p style="margin: 5px 0;"><strong>Address:</strong> ${addressString}</p>` : ''}
+                        ${isLoadingAddress ? `<p style="margin: 5px 0;"><em>Loading address...</em></p>` : ''}
+                        ${buildingType ? `<p style="margin: 5px 0;"><strong>Type:</strong> ${buildingType}</p>` : ''}
+                        ${buildingOperator ? `<p style="margin: 5px 0;"><strong>Operator:</strong> ${buildingOperator}</p>` : ''}
+                        ${buildingTourism ? `<p style="margin: 5px 0;"><strong>Tourism Type:</strong> ${buildingTourism}</p>` : ''}
+                        ${buildingHeight ? `<p style="margin: 5px 0;"><strong>Height:</strong> ${buildingHeight}m</p>` : ''}
+                        ${buildingOpeningHours ? `<p style="margin: 5px 0;"><strong>Opening Hours:</strong> ${buildingOpeningHours}</p>` : ''}
+                        ${buildingAccess ? `<p style="margin: 5px 0;"><strong>Access:</strong> ${buildingAccess}</p>` : ''}
+                        ${buildingDescription ? `<p style="margin: 5px 0;"><strong>Description:</strong> ${buildingDescription}</p>` : ''}
+                        ${buildingWikidata ? `<p style="margin: 5px 0;"><strong>Wikidata:</strong> <a href="https://www.wikidata.org/wiki/${buildingWikidata}" target="_blank" style="color: #2196F3; text-decoration: none;">${buildingWikidata}</a></p>` : ''}
+                        ${buildingRef ? `<p style="margin: 5px 0;"><strong>Reference:</strong> <a href="${buildingRef}" target="_blank" style="color: #2196F3; text-decoration: none;">Website</a></p>` : ''}
+                      </div>
+                      <button 
+                        onclick="window.location.href='/nft'"
+                        style="
+                          background-color: #2196F3;
+                          color: white;
+                          padding: 8px 16px;
+                          border: none;
+                          border-radius: 4px;
+                          cursor: pointer;
+                          width: 100%;
+                          font-size: 14px;
+                          transition: background-color 0.2s;
+                        "
+                        onmouseover="this.style.backgroundColor='#1976D2'"
+                        onmouseout="this.style.backgroundColor='#2196F3'"
+                      >
+                        View NFT
+                      </button>
+                    </div>
+                  `,
+                });
+              }
+            }
+          } else {
+            console.log('No object picked, closing popup');
+            setPopup(null);
+          }
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
         // Set initial camera position (Auckland, New Zealand)
         viewer.camera.flyTo({
@@ -177,5 +441,16 @@ export default function CesiumMap() {
     })
   }
 
-  return <div ref={cesiumContainerRef} className="w-full h-[600px]"></div>
+  return (
+    <div style={{ position: 'relative' }}>
+      <div ref={cesiumContainerRef} className="w-full h-[600px]"></div>
+      {popup && (
+        <CustomPopup
+          position={popup.position}
+          content={popup.content}
+          onClose={() => setPopup(null)}
+        />
+      )}
+    </div>
+  )
 }

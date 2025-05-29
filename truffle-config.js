@@ -1,4 +1,5 @@
-require('dotenv').config();
+require('dotenv').config({ path: '.env.sepolia' });
+const HDWalletProvider = require('@truffle/hdwallet-provider');
 
 module.exports = {
     networks: {
@@ -17,10 +18,10 @@ module.exports = {
         gasPrice: 20000000000,
       },
       sepolia: {
-        provider: () => new HDWalletProvider(
-          process.env.PRIVATE_KEY,
-          process.env.SEPOLIA_RPC_URL
-        ),
+        provider: () => new HDWalletProvider({
+          privateKeys: [process.env.NEXT_PUBLIC_PRIVATE_KEY],
+          providerOrUrl: process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL
+        }),
         network_id: 11155111,
         gas: 5500000,
         confirmations: 2,

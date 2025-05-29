@@ -18,12 +18,6 @@ type EthereumProvider = {
   send: (method: string, params?: any[]) => Promise<any>
 }
 
-declare global {
-  interface Window {
-    ethereum?: EthereumProvider
-  }
-}
-
 export default function Navbar() {
   const [walletConnected, setWalletConnected] = useState(false)
   const [walletAddress, setWalletAddress] = useState("")
@@ -42,10 +36,41 @@ export default function Navbar() {
 
   const getNetworkName = (chainId: string) => {
     switch (chainId) {
-      case "1337":
-        return "Ganache"
+      // Mainnet
+      case "1":
+        return "Ethereum Mainnet"
+      // Testnets
+      case "5":
+        return "Goerli"
       case "11155111":
         return "Sepolia"
+      // Layer 2
+      case "10":
+        return "Optimism"
+      case "137":
+        return "Polygon"
+      case "42161":
+        return "Arbitrum One"
+      case "42170":
+        return "Arbitrum Nova"
+      case "8453":
+        return "Base"
+      // Development
+      case "1337":
+        return "Ganache"
+      case "31337":
+        return "Hardhat"
+      // Other common networks
+      case "56":
+        return "BNB Chain"
+      case "100":
+        return "Gnosis"
+      case "250":
+        return "Fantom"
+      case "43114":
+        return "Avalanche"
+      case "42220":
+        return "Celo"
       default:
         return `Chain ${chainId}`
     }
@@ -178,9 +203,19 @@ export default function Navbar() {
         </div>
         <div className="ml-auto flex items-center space-x-4">
           {currentNetworkId && (
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <div className={cn(
+              "flex items-center space-x-2 text-sm",
+              isNetworkMismatch ? "text-destructive" : "text-muted-foreground"
+            )}>
               <Network className="h-4 w-4" />
-              <span>{getNetworkName(currentNetworkId)}</span>
+              <span>
+                {getNetworkName(currentNetworkId)}
+                {isNetworkMismatch && (
+                  <span className="ml-1">
+                    (Target: {getNetworkName(TARGET_NETWORK_ID)})
+                  </span>
+                )}
+              </span>
             </div>
           )}
           {isNetworkMismatch && (
@@ -190,7 +225,7 @@ export default function Navbar() {
               onClick={switchNetwork}
             >
               <AlertCircle className="h-4 w-4" />
-              <span>Switch to {TARGET_NETWORK_ID === "1337" ? "Ganache" : "Sepolia"}</span>
+              <span>Switch Network</span>
             </Button>
           )}
           {walletConnected ? (
