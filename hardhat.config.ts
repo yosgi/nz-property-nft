@@ -3,7 +3,7 @@ import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-ethers";
 import "@nomicfoundation/hardhat-verify";
 import * as dotenv from "dotenv";
-
+dotenv.config({ path: ".env.local" });
 dotenv.config();
 
 const config: HardhatUserConfig = {
@@ -18,8 +18,8 @@ const config: HardhatUserConfig = {
   },
   networks: {
     sepolia: {
-      url: process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "",
-      accounts: process.env.NEXT_PUBLIC_PRIVATE_KEY ? [process.env.NEXT_PUBLIC_PRIVATE_KEY] : []
+      url: process.env.SEPOLIA_RPC_URL || "",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
     },
     hardhat: {
       chainId: 1337

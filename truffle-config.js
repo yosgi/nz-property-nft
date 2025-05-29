@@ -19,8 +19,8 @@ module.exports = {
       },
       sepolia: {
         provider: () => new HDWalletProvider({
-          privateKeys: [process.env.NEXT_PUBLIC_PRIVATE_KEY],
-          providerOrUrl: process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,
+          privateKeys: [process.env.PRIVATE_KEY],
+          providerOrUrl: process.env.SEPOLIA_RPC_URL,
           pollingInterval: 10000,
           timeoutBlocks: 200,
           networkCheckTimeout: 100000,
