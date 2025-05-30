@@ -2,7 +2,6 @@
   "name": "property-nft",
   "version": "0.1.0",
   "private": true,
-  
   "scripts": {
     "dev": "next dev",
     "dev:sepolia": "cp .env.sepolia .env.local && next dev",
@@ -53,6 +52,7 @@
     "@radix-ui/react-toggle-group": "1.1.1",
     "@radix-ui/react-tooltip": "1.1.6",
     "@react-google-maps/api": "^2.20.6",
+    "@vercel/analytics": "^1.5.0",
     "cesium": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

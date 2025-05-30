@@ -4,7 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import Navbar from "@/components/navbar"
 import { ThemeProvider } from "@/components/theme-provider"
-
+import { Analytics } from "@vercel/analytics/next"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
@@ -19,11 +19,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
+    
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="stylesheet" href="/static/cesium/Widgets/widgets.css" />
       </head>
       <body className={inter.className}>
+        <Analytics />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
