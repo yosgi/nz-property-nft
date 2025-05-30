@@ -30,7 +30,6 @@ export default function Navbar() {
     { href: "/submit", label: "Submit" },
     { href: "/nft", label: "NFT" },
     { href: "/map", label: "Map" },
-    { href: "/verify", label: "Verify" },
     { href: "/valuation", label: "My Properties" },
   ]
 

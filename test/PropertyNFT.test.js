@@ -742,6 +742,21 @@ describe("PropertyNFT", function () {
       expect(finalStatus.hasVerified).to.equal(true);
       expect(finalStatus.pendingIsVerified).to.equal(false);
       expect(finalStatus.canConfirm).to.equal(false);
+
+      // submit valuation update
+      await propertyValuation.connect(addr1).submitValuation(
+        0,
+        1250000,
+        1200000,
+        85,
+        72,
+        90,
+        65,
+        88
+      );
+      // check 
+      
+      
     });
 
     it("should return correct debug information", async () => {

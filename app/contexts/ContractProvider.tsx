@@ -63,6 +63,16 @@ interface ContractContextType {
   getProperty: (tokenId: string) => Promise<PropertyData>
   transferNFT: (tokenId: string, to: string) => Promise<ethers.ContractTransactionResponse>
   estimateTransferGas: (tokenId: string, to: string) => Promise<bigint>
+  voteOnValuation: (tokenId: number, approve: boolean) => Promise<ethers.ContractTransactionResponse>
+  hasUserVotedOnValuation: (tokenId: number, userAddress?: string) => Promise<boolean>
+  
+  // Enhanced submit vote for valuations
+  submitValuationVote: (tokenId: string, approve: boolean) => Promise<void>
+  // Valuation confirmation
+  confirmValuationUpdate: (tokenId: number) => Promise<ethers.ContractTransactionResponse>
+  
+  // Check authorization status
+  isContractAuthorized: () => Promise<boolean>
 }
 
 const ContractContext = createContext<ContractContextType | null>(null)
@@ -272,6 +282,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
       while (hasMore) {
         try {
           const propertyData = await propertyNFT!.properties(index)
+          console.log("propertyData",propertyData)
           if (!propertyData[0] || propertyData[0] === "") {
             hasMore = false
             continue
@@ -627,6 +638,86 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Vote on property valuation
+  const voteOnValuation = async (tokenId: number, approve: boolean) => {
+    await ensureReady()
+    if (!propertyValuation) throw new Error("Valuation contract not initialized")
+    
+    return await propertyValuation.voteOnValuation(tokenId, approve)
+  }
+
+  // Check if user has voted on a pending valuation
+  const hasUserVotedOnValuation = async (tokenId: number, userAddress?: string) => {
+    await ensureReady()
+    if (!propertyValuation) throw new Error("Valuation contract not initialized")
+    
+    const addressToCheck = userAddress || address
+    if (!addressToCheck) return false
+    
+    try {
+      return await propertyValuation.hasUserVotedOnPending(tokenId, addressToCheck)
+    } catch (error) {
+      console.error(`Error checking valuation vote status for token ${tokenId}:`, error)
+      return false
+    }
+  }
+
+  // Submit valuation vote with UI feedback
+  const submitValuationVote = async (tokenId: string, approve: boolean) => {
+    if (!propertyValuation || !signer) {
+      toast.error("Please connect your wallet first")
+      return
+    }
+
+    try {
+      setTransactionPending(true)
+      setVotingProperty(tokenId)
+      
+      const tx = await propertyValuation.voteOnValuation(Number(tokenId), approve)
+      await tx.wait()
+      
+      toast.success(`Valuation ${approve ? 'approved' : 'rejected'} successfully`)
+      
+      // Refresh properties after voting
+      await getPropertiesWithPagination({ page: 1, limit: 12 })
+    } catch (error) {
+      console.error("Error voting on valuation:", error)
+      
+      // Extract the error message from the revert reason
+      const errorMessage = error instanceof Error && error.message.includes("reason=")
+        ? error.message.split("reason=")[1].split(",")[0].replace(/"/g, "")
+        : "Failed to submit valuation vote"
+      toast.error(errorMessage)
+    } finally {
+      setTransactionPending(false)
+      setVotingProperty(null)
+    }
+  }
+  const confirmValuationUpdate = async (tokenId: number) => {
+    await ensureReady()
+    if (!propertyValuation) throw new Error("Valuation contract not initialized")
+    
+    try {
+      return await propertyValuation.confirmValuationUpdate(tokenId)
+    } catch (error) {
+      console.error("Error confirming valuation update:", error)
+      throw error
+    }
+  }
+
+  // Check if the valuation contract is authorized to update property values
+  const isContractAuthorized = async () => {
+    await ensureReady()
+    if (!propertyValuation) throw new Error("Valuation contract not initialized")
+    
+    try {
+      return await propertyValuation.isAuthorizedToUpdate()
+    } catch (error) {
+      console.error("Error checking contract authorization:", error)
+      return false
+    }
+  }
+
   return (
     <ContractContext.Provider
       value={{
@@ -646,7 +737,12 @@ export function ContractProvider({ children }: { children: ReactNode }) {
         votingProperty,
         getProperty,
         transferNFT,
-        estimateTransferGas
+        estimateTransferGas,
+        voteOnValuation,
+        hasUserVotedOnValuation,
+        submitValuationVote,
+        confirmValuationUpdate,
+        isContractAuthorized
       }}
     >
       {children}

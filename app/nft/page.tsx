@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, ExternalLink, CheckCircle, XCircle } from "lucide-react"
+import { PlusCircle, ExternalLink, CheckCircle, XCircle, Clock, TrendingUp } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import contractArtifact from "../../public/contracts/PropertyNFT.json"
 import { useContract } from "../contexts/ContractProvider"
@@ -29,15 +29,38 @@ type Property = {
   currentOwner: string
   verificationVotes: bigint
   rejectionVotes: bigint
+  hasValuation: boolean
+  valuationVerified: boolean
+  hasPendingValuation: boolean
+  pendingValuationVerified: boolean
+  hasVotedOnValuation: boolean
+  pendingValuationVotes: number
+  pendingValuationRejections: number
+  pendingEstimatedValue: bigint
+  pendingComparableValue: bigint
+  pendingLastUpdated: bigint
+  pendingLocationScore: number
+  pendingSizeScore: number
+  pendingConditionScore: number
+  pendingAgeScore: number
+  pendingRenovationScore: number
 }
 
 function PropertyCard({ property }: { property: Property }) {
-  const { submitVote, transactionPending, votingProperty } = useContract()
+  const { submitVote, submitValuationVote, transactionPending, votingProperty } = useContract()
   const router = useRouter()
 
   const handleVote = async (approve: boolean) => {
     try {
       await submitVote(property.tokenId.toString(), approve)
+    } catch (err) {
+      // Error is handled by the provider
+    }
+  }
+
+  const handleValuationVote = async (approve: boolean) => {
+    try {
+      await submitValuationVote(property.tokenId.toString(), approve)
     } catch (err) {
       // Error is handled by the provider
     }
@@ -53,6 +76,51 @@ function PropertyCard({ property }: { property: Property }) {
       toast.error("Failed to view property details")
     }
   }
+
+  // Determine property status
+  const getPropertyStatus = () => {
+    if (!property.isVerified) {
+      return { 
+        label: "Pending Verification", 
+        color: "bg-yellow-100 text-yellow-800", 
+        icon: <Clock className="h-3 w-3 mr-1" /> 
+      }
+    }
+    
+    // Property is verified, check valuation status
+    if (property.hasValuation) {
+      return { 
+        label: "Fully Verified", 
+        color: "bg-green-100 text-green-800", 
+        icon: <CheckCircle className="h-3 w-3 mr-1" /> 
+      }
+    }
+    
+    if (property.hasPendingValuation) {
+      if (property.pendingValuationVerified) {
+        return { 
+          label: "Valuation Verified", 
+          color: "bg-purple-100 text-purple-800", 
+          icon: <CheckCircle className="h-3 w-3 mr-1" /> 
+        }
+      } else {
+        return { 
+          label: "Valuation Submitted", 
+          color: "bg-orange-100 text-orange-800", 
+          icon: <Clock className="h-3 w-3 mr-1" /> 
+        }
+      }
+    }
+    
+    // Verified but no valuation at all
+    return { 
+      label: "Needs Valuation", 
+      color: "bg-blue-100 text-blue-800", 
+      icon: <TrendingUp className="h-3 w-3 mr-1" /> 
+    }
+  }
+
+  const status = getPropertyStatus()
 
   return (
     <Card className="h-full hover:shadow-lg transition-shadow duration-200">
@@ -86,14 +154,10 @@ function PropertyCard({ property }: { property: Property }) {
             <ExternalLink className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={property.isVerified ? "default" : "secondary"}>
-            {property.isVerified ? (
-              <CheckCircle className="h-3 w-3 mr-1" />
-            ) : (
-              <XCircle className="h-3 w-3 mr-1" />
-            )}
-            {property.isVerified ? "Verified" : "Unverified"}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className={status.color}>
+            {status.icon}
+            {status.label}
           </Badge>
           <Badge variant="outline">{property.propertyType}</Badge>
         </div>
@@ -101,6 +165,12 @@ function PropertyCard({ property }: { property: Property }) {
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span>Verification: {Number(property.verificationVotes)} votes</span>
             <span>Rejection: {Number(property.rejectionVotes)} votes</span>
+          </div>
+        )}
+        {property.hasPendingValuation && !property.pendingValuationVerified && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Valuation Votes: {property.pendingValuationVotes || 0}</span>
+            <span>Rejections: {property.pendingValuationRejections || 0}</span>
           </div>
         )}
       </CardHeader>
@@ -112,9 +182,74 @@ function PropertyCard({ property }: { property: Property }) {
           </div>
           <div>
             <h3 className="text-sm font-medium text-gray-500">Estimated Value</h3>
-            <p className="text-sm font-semibold">
-              {ethers.formatEther(property.estimatedValue.toString())} ETH
-            </p>
+            <div className="space-y-1">
+              {/* Current/Verified Value */}
+              <p className="text-sm font-semibold">
+                {property.estimatedValue > 0 
+                  ? `${ethers.formatEther(property.estimatedValue.toString())} ETH`
+                  : "Not valued"
+                }
+              </p>
+              {/* Pending Value */}
+              {property.hasPendingValuation && (
+                property.pendingEstimatedValue > 0 || 
+                property.pendingLocationScore > 0 || 
+                property.pendingSizeScore > 0 ||
+                property.pendingConditionScore > 0 ||
+                property.pendingAgeScore > 0 ||
+                property.pendingRenovationScore > 0
+              ) && (
+                <div className="text-xs bg-blue-50 border border-blue-200 p-2 rounded space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-blue-800">Pending Valuation:</span>
+                    {property.pendingValuationVerified && (
+                      <span className="text-green-600 text-xs">✓ Verified</span>
+                    )}
+                  </div>
+                  <div className="text-blue-700">
+                    {property.pendingEstimatedValue > 0 && (
+                      <p><strong>Est. Value:</strong> {ethers.formatEther(property.pendingEstimatedValue.toString())} ETH</p>
+                    )}
+                    {property.pendingComparableValue > 0 && (
+                      <p><strong>Comparable:</strong> {ethers.formatEther(property.pendingComparableValue.toString())} ETH</p>
+                    )}
+                  </div>
+                  {/* Valuation Scores */}
+                  {(property.pendingLocationScore > 0 || property.pendingSizeScore > 0 || 
+                    property.pendingConditionScore > 0 || property.pendingAgeScore > 0 || 
+                    property.pendingRenovationScore > 0) && (
+                    <div className="grid grid-cols-2 gap-1 text-xs text-blue-600 mt-2">
+                      {property.pendingLocationScore > 0 && (
+                        <div>Location: {property.pendingLocationScore}/100</div>
+                      )}
+                      {property.pendingSizeScore > 0 && (
+                        <div>Size: {property.pendingSizeScore}/100</div>
+                      )}
+                      {property.pendingConditionScore > 0 && (
+                        <div>Condition: {property.pendingConditionScore}/100</div>
+                      )}
+                      {property.pendingAgeScore > 0 && (
+                        <div>Age: {property.pendingAgeScore}/100</div>
+                      )}
+                      {property.pendingRenovationScore > 0 && (
+                        <div>Renovation: {property.pendingRenovationScore}/100</div>
+                      )}
+                    </div>
+                  )}
+                  {/* Voting Status */}
+                  <div className="flex justify-between text-xs text-blue-600 mt-1">
+                    <span>Votes: {property.pendingValuationVotes}</span>
+                    <span>Rejections: {property.pendingValuationRejections}</span>
+                  </div>
+                  {/* Last Updated */}
+                  {property.pendingLastUpdated > 0 && (
+                    <p className="text-xs text-gray-600">
+                      Updated: {new Date(Number(property.pendingLastUpdated) * 1000).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <h3 className="text-sm font-medium text-gray-500">Location</h3>
@@ -126,6 +261,7 @@ function PropertyCard({ property }: { property: Property }) {
       </CardContent>
       <CardFooter>
         <div className="w-full space-y-2">
+          {/* Property verification voting */}
           {!property.isVerified && (
             <div className="flex gap-2">
               <Button
@@ -159,6 +295,52 @@ function PropertyCard({ property }: { property: Property }) {
               </Button>
             </div>
           )}
+          
+          {/* Valuation voting */}
+          {property.hasPendingValuation && !property.pendingValuationVerified && !property.hasVotedOnValuation && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 hover:bg-red-50 hover:text-red-700 hover:border-red-200"
+                onClick={(e) => {
+                  e.preventDefault()
+                  handleValuationVote(false)
+                }}
+                disabled={transactionPending && votingProperty === property.tokenId.toString()}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                {transactionPending && votingProperty === property.tokenId.toString() ? "Voting..." : "Reject"}
+                <Badge variant="outline" className="ml-2 bg-red-50 text-red-700 border-red-200">
+                  {property.pendingValuationRejections || 0}
+                </Badge>
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200"
+                onClick={(e) => {
+                  e.preventDefault()
+                  handleValuationVote(true)
+                }}
+                disabled={transactionPending && votingProperty === property.tokenId.toString()}
+              >
+                <TrendingUp className="mr-2 h-4 w-4" />
+                {transactionPending && votingProperty === property.tokenId.toString() ? "Voting..." : "Approve"}
+                <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-200">
+                  {property.pendingValuationVotes || 0}
+                </Badge>
+              </Button>
+            </div>
+          )}
+          
+          {/* Show if user has already voted on valuation */}
+          {property.hasPendingValuation && property.hasVotedOnValuation && (
+            <div className="text-center py-2">
+              <Badge variant="outline" className="bg-gray-50 text-gray-700">
+                You have voted on this valuation
+              </Badge>
+            </div>
+          )}
+          
           <Button variant="outline" className="w-full" onClick={handleViewDetails}>
             View Details
           </Button>
@@ -170,35 +352,226 @@ function PropertyCard({ property }: { property: Property }) {
 
 export default function NFTListPage() {
   const [error, setError] = useState<string | null>(null)
-  const [properties, setProperties] = useState<Property[]>([])
-  const [activeTab, setActiveTab] = useState("all")
-  const { getPropertiesWithPagination, isReady, transactionPending, connect } = useContract()
+  const [allProperties, setAllProperties] = useState<Property[]>([])
+  const [filteredProperties, setFilteredProperties] = useState<Property[]>([])
+  const [activeTab, setActiveTab] = useState("pending-verification")
+  const { getPropertiesWithPagination, isReady, transactionPending, connect, propertyValuation, address } = useContract()
 
-  // Fetch properties when tab changes or when ready state changes
+  // Fetch all properties
   useEffect(() => {
     const fetchProperties = async () => {
       try {
         const result = await getPropertiesWithPagination({
-          verifiedOnly: activeTab === "verified",
-          propertyType: activeTab === "my-properties" ? undefined : undefined,
-          owner: activeTab === "my-properties" ? (window.ethereum as any)?.selectedAddress : undefined
+          page: 1,
+          limit: 100 // Get more properties to filter client-side
         })
-        setProperties(result.properties as Property[])
+        
+        // Add valuation status to properties using actual contract data
+        const propertiesWithValuation = await Promise.all(
+          result.properties.map(async (property) => {
+            try {
+              if (!propertyValuation) {
+                return {
+                  ...property,
+                  hasValuation: false,
+                  valuationVerified: false,
+                  hasPendingValuation: false,
+                  pendingValuationVerified: false
+                }
+              }
+
+              // Check for verified valuation (from main valuations mapping)
+              let hasValuation = false
+              let valuationVerified = false
+              try {
+                const verifiedValuation = await propertyValuation.getValuation(Number(property.tokenId))
+                hasValuation = verifiedValuation && Number(verifiedValuation[0]) > 0 // estimatedValue > 0
+                valuationVerified = verifiedValuation && verifiedValuation[8] // isVerified
+              } catch (error) {
+                // Property might not have verified valuation yet
+                hasValuation = false
+                valuationVerified = false
+              }
+              
+              // Check for pending valuation
+              let hasPendingValuation = false
+              let pendingValuationVerified = false
+              let pendingValuationVotes = 0
+              let pendingValuationRejections = 0
+              let hasVotedOnValuation = false
+              let pendingEstimatedValue = BigInt(0)
+              let pendingComparableValue = BigInt(0)
+              let pendingLastUpdated = BigInt(0)
+              let pendingLocationScore = 0
+              let pendingSizeScore = 0
+              let pendingConditionScore = 0
+              let pendingAgeScore = 0
+              let pendingRenovationScore = 0
+              
+              try {
+                const pendingValuation = await propertyValuation.getPendingValuation(Number(property.tokenId))
+                console.log(`Pending valuation for token ${property.tokenId}:`, pendingValuation)
+                
+                // Check if pending valuation exists - look for any non-zero value
+                hasPendingValuation = pendingValuation && (
+                  Number(pendingValuation.estimatedValue) > 0 ||
+                  Number(pendingValuation.comparableValue) > 0 ||
+                  pendingValuation.locationScore > 0 ||
+                  pendingValuation.sizeScore > 0 ||
+                  pendingValuation.conditionScore > 0 ||
+                  pendingValuation.ageScore > 0 ||
+                  pendingValuation.renovationScore > 0
+                )
+                
+                if (hasPendingValuation && pendingValuation) {
+                  pendingValuationVerified = pendingValuation.isVerified
+                  pendingValuationVotes = Number(pendingValuation.verificationVotes)
+                  pendingValuationRejections = Number(pendingValuation.rejectionVotes)
+                  pendingEstimatedValue = pendingValuation.estimatedValue || BigInt(0)
+                  pendingComparableValue = pendingValuation.comparableValue || BigInt(0)
+                  pendingLastUpdated = pendingValuation.lastUpdated || BigInt(0)
+                  pendingLocationScore = Number(pendingValuation.locationScore) || 0
+                  pendingSizeScore = Number(pendingValuation.sizeScore) || 0
+                  pendingConditionScore = Number(pendingValuation.conditionScore) || 0
+                  pendingAgeScore = Number(pendingValuation.ageScore) || 0
+                  pendingRenovationScore = Number(pendingValuation.renovationScore) || 0
+                  
+                  console.log(`Property ${property.tokenId} has pending valuation:`, {
+                    estimatedValue: pendingEstimatedValue.toString(),
+                    comparableValue: pendingComparableValue.toString(),
+                    isVerified: pendingValuationVerified,
+                    scores: {
+                      location: pendingLocationScore,
+                      size: pendingSizeScore,
+                      condition: pendingConditionScore,
+                      age: pendingAgeScore,
+                      renovation: pendingRenovationScore
+                    }
+                  })
+                }
+                
+                // // Check if current user has voted on this pending valuation
+                // if (address && hasPendingValuation) {
+                //   hasVotedOnValuation = await propertyValuation.hasUserVotedOnPending(Number(property.tokenId), address)
+                // }
+              } catch (error) {
+                console.error(`Error getting pending valuation for token ${property.tokenId}:`, error)
+                // Property might not have pending valuation
+                hasPendingValuation = false
+                pendingValuationVerified = false
+              }
+              
+              return {
+                ...property,
+                hasValuation,
+                valuationVerified,
+                hasPendingValuation,
+                pendingValuationVerified,
+                hasVotedOnValuation,
+                pendingValuationVotes,
+                pendingValuationRejections,
+                pendingEstimatedValue,
+                pendingComparableValue,
+                pendingLastUpdated,
+                pendingLocationScore,
+                pendingSizeScore,
+                pendingConditionScore,
+                pendingAgeScore,
+                pendingRenovationScore
+              }
+            } catch (error) {
+              console.error(`Error getting valuation status for property ${property.tokenId}:`, error)
+              // Return property with default valuation status
+              return {
+                ...property,
+                hasValuation: false,
+                valuationVerified: false,
+                hasPendingValuation: false,
+                pendingValuationVerified: false,
+                hasVotedOnValuation: false,
+                pendingValuationVotes: 0,
+                pendingValuationRejections: 0,
+                pendingEstimatedValue: BigInt(0),
+                pendingComparableValue: BigInt(0),
+                pendingLastUpdated: BigInt(0),
+                pendingLocationScore: 0,
+                pendingSizeScore: 0,
+                pendingConditionScore: 0,
+                pendingAgeScore: 0,
+                pendingRenovationScore: 0
+              }
+            }
+          })
+        )
+        
+        setAllProperties(propertiesWithValuation as Property[])
       } catch (error) {
         console.error("Error fetching properties:", error)
         setError("Failed to fetch properties")
       }
     }
 
-    if (isReady) {
+    if (isReady && propertyValuation && address) {
       fetchProperties()
     }
-  }, [activeTab, isReady, getPropertiesWithPagination])
+  }, [isReady, getPropertiesWithPagination, propertyValuation, address])
+
+  // Filter properties based on active tab
+  useEffect(() => {
+    let filtered: Property[] = []
+    
+    switch (activeTab) {
+      case "pending-verification":
+        // Properties that haven't been verified yet
+        filtered = allProperties.filter(p => !p.isVerified)
+        break
+      case "pending-valuation":
+        // Properties that are verified but need valuation OR have pending valuation that needs votes
+        filtered = allProperties.filter(p => 
+          p.isVerified && (
+            // No valuation at all (needs initial valuation)
+            (!p.hasValuation && !p.hasPendingValuation) ||
+            // Has pending valuation (either waiting for votes or waiting for confirmation)
+            (p.hasPendingValuation)
+          )
+        )
+        break
+      case "verified":
+        // Properties that are verified and have some form of completed valuation process
+        filtered = allProperties.filter(p => 
+          p.isVerified && p.hasValuation
+        )
+        break
+      case "valuated":
+        // Properties that are fully completed - same as verified for now
+        filtered = allProperties.filter(p => 
+          p.isVerified && p.hasValuation
+        )
+        break
+      default:
+        filtered = allProperties.filter(p => !p.isVerified) // Default to pending verification
+    }
+    
+    setFilteredProperties(filtered)
+  }, [allProperties, activeTab])
 
   // Calculate counts for each category
-  const verifiedCount = properties.filter(p => p.isVerified).length
-  const unverifiedCount = properties.filter(p => !p.isVerified).length
-  const myPropertiesCount = properties.filter(p => p.currentOwner.toLowerCase() === (window.ethereum as any)?.selectedAddress?.toLowerCase()).length
+  const pendingVerificationCount = allProperties.filter(p => !p.isVerified).length
+  
+  const pendingValuationCount = allProperties.filter(p => 
+    p.isVerified && (
+      (!p.hasValuation && !p.hasPendingValuation) ||
+      (p.hasPendingValuation)
+    )
+  ).length
+  
+  const verifiedCount = allProperties.filter(p => 
+    p.isVerified && p.hasValuation
+  ).length
+  
+  const valuatedCount = allProperties.filter(p => 
+    p.isVerified && p.hasValuation
+  ).length
 
   if (!isReady) {
     return (
@@ -236,13 +609,21 @@ export default function NFTListPage() {
         </Link>
       </div>
 
-      <Tabs defaultValue="all" className="w-full" onValueChange={setActiveTab}>
+      <Tabs defaultValue="pending-verification" className="w-full" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="all" className="relative">
-            All Properties
-            {properties.length > 0 && (
-              <Badge variant="secondary" className="ml-2 bg-gray-100 text-gray-800 hover:bg-gray-200">
-                {properties.length}
+          <TabsTrigger value="pending-verification" className="relative">
+            Pending Verification
+            {pendingVerificationCount > 0 && (
+              <Badge variant="secondary" className="ml-2 bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+                {pendingVerificationCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="pending-valuation" className="relative">
+            Needs Valuation
+            {pendingValuationCount > 0 && (
+              <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 hover:bg-blue-200">
+                {pendingValuationCount}
               </Badge>
             )}
           </TabsTrigger>
@@ -254,19 +635,11 @@ export default function NFTListPage() {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="unverified" className="relative">
-            Unverified
-            {unverifiedCount > 0 && (
-              <Badge variant="secondary" className="ml-2 bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
-                {unverifiedCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="my-properties" className="relative">
-            My Properties
-            {myPropertiesCount > 0 && (
-              <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 hover:bg-blue-200">
-                {myPropertiesCount}
+          <TabsTrigger value="valuated" className="relative">
+            Valuated
+            {valuatedCount > 0 && (
+              <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-800 hover:bg-purple-200">
+                {valuatedCount}
               </Badge>
             )}
           </TabsTrigger>
@@ -285,52 +658,39 @@ export default function NFTListPage() {
             </div>
           )}
 
-          <TabsContent value="all" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {properties.map((property) => (
-                <PropertyCard key={property.tokenId.toString()} property={property} />
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="verified" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {properties.map((property) => (
-                <PropertyCard key={property.tokenId.toString()} property={property} />
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="unverified" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {properties.map((property) => (
-                <PropertyCard key={property.tokenId.toString()} property={property} />
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="my-properties" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {properties.map((property) => (
-                <PropertyCard key={property.tokenId.toString()} property={property} />
-              ))}
-            </div>
-          </TabsContent>
+          {/* All tab content renders the same grid, just with different filtered data */}
+          {["pending-verification", "pending-valuation", "verified", "valuated"].map((tabValue) => (
+            <TabsContent key={tabValue} value={tabValue} className="mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredProperties.map((property) => (
+                  <PropertyCard key={property.tokenId.toString()} property={property} />
+                ))}
+              </div>
+              {filteredProperties.length === 0 && (
+                <div className="text-center py-12">
+                  <h2 className="text-xl font-semibold text-gray-600">
+                    No properties found in this category
+                  </h2>
+                  <p className="text-gray-500 mt-2">
+                    {tabValue === "pending-verification" && "All properties have been verified!"}
+                    {tabValue === "pending-valuation" && "No properties need valuation!"}
+                    {tabValue === "verified" && "No verified properties found!"}
+                    {tabValue === "valuated" && "No fully valuated properties yet!"}
+                  </p>
+                  {tabValue === "pending-verification" && (
+                    <Link href="/submit" className="mt-4 inline-block">
+                      <Button>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Submit Property
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+          ))}
         </div>
       </Tabs>
-
-      {properties.length === 0 && (
-        <div className="text-center py-12">
-          <h2 className="text-xl font-semibold text-gray-600">No properties found</h2>
-          <p className="text-gray-500 mt-2">Be the first to submit a property!</p>
-          <Link href="/submit" className="mt-4 inline-block">
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Submit Property
-            </Button>
-          </Link>
-        </div>
-      )}
     </div>
   )
 }

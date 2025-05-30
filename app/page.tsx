@@ -79,7 +79,7 @@ export default function HomePage() {
           </CardFooter>
         </Card>
 
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CheckCircle className="h-8 w-8 mb-2 text-primary" />
             <CardTitle>Community Verification</CardTitle>
@@ -95,7 +95,7 @@ export default function HomePage() {
               <Link href="/verify">Verify Properties</Link>
             </Button>
           </CardFooter>
-        </Card>
+        </Card> */}
 
         <Card>
           <CardHeader>
