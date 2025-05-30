@@ -32,7 +32,7 @@ const NZ_PROPERTY_TYPES: Record<string, string> = {
 }
 
 export default function SubmitPage() {
-  const { submitProperty, isConnected, connect } = useContract()
+  const { submitProperty, connect } = useContract()
   const [formData, setFormData] = useState({
     address: "",
     ownerName: "",
@@ -204,10 +204,6 @@ export default function SubmitPage() {
         throw new Error("Please upload a property image")
       }
 
-      if (!isConnected) {
-        await connect()
-      }
-
       // Upload image to IPFS
       const imageURI = await uploadToIPFS(formData.image)
 
@@ -248,7 +244,19 @@ export default function SubmitPage() {
     <div className="max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">Submit Property</h1>
 
-      <Card>
+      <Card className="relative">
+        {/* Loading Overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+              <p className="text-sm text-gray-600">
+                Submitting property...
+              </p>
+            </div>
+          </div>
+        )}
+
         <CardHeader>
           <CardTitle>Property Information</CardTitle>
           <CardDescription>Enter the details of your property to create an NFT representation.</CardDescription>

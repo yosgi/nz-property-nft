@@ -263,12 +263,12 @@ export default function NFTDetailPage() {
 
       <div className="space-y-6 max-w-[600px] mx-auto relative">
         {/* Loading Overlay */}
-        {(transactionPending) && (
+        {(transactionPending || votingProperty === tokenId) && (
           <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
             <div className="flex flex-col items-center gap-2">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
               <p className="text-sm text-gray-600">
-                {transactionPending ? "Processing transaction..." : "Loading property data..."}
+                {votingProperty === tokenId ? "Submitting vote..." : "Processing transaction..."}
               </p>
             </div>
           </div>
