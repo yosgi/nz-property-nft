@@ -23,6 +23,54 @@ import type {
   TypedContractMethod,
 } from "../common";
 
+export declare namespace PropertyNFT {
+  export type PropertySummaryStruct = {
+    tokenId: BigNumberish;
+    propertyAddress: string;
+    ownerName: string;
+    propertyType: string;
+    renovationDate: BigNumberish;
+    imageURI: string;
+    latitude: BigNumberish;
+    longitude: BigNumberish;
+    isVerified: boolean;
+    estimatedValue: BigNumberish;
+    verificationVotes: BigNumberish;
+    rejectionVotes: BigNumberish;
+    currentOwner: AddressLike;
+  };
+
+  export type PropertySummaryStructOutput = [
+    tokenId: bigint,
+    propertyAddress: string,
+    ownerName: string,
+    propertyType: string,
+    renovationDate: bigint,
+    imageURI: string,
+    latitude: bigint,
+    longitude: bigint,
+    isVerified: boolean,
+    estimatedValue: bigint,
+    verificationVotes: bigint,
+    rejectionVotes: bigint,
+    currentOwner: string
+  ] & {
+    tokenId: bigint;
+    propertyAddress: string;
+    ownerName: string;
+    propertyType: string;
+    renovationDate: bigint;
+    imageURI: string;
+    latitude: bigint;
+    longitude: bigint;
+    isVerified: boolean;
+    estimatedValue: bigint;
+    verificationVotes: bigint;
+    rejectionVotes: bigint;
+    currentOwner: string;
+  };
+}
+
 export interface PropertyNFTInterface extends Interface {
   getFunction(
     nameOrSignature:
@@ -33,6 +81,9 @@ export interface PropertyNFTInterface extends Interface {
       | "authorizedContracts"
       | "balanceOf"
       | "getApproved"
+      | "getMultipleProperties"
+      | "getOwnerPropertiesDetailed"
+      | "getPropertiesByType"
       | "isApprovedForAll"
       | "isAuthorizedContract"
       | "name"
@@ -40,6 +91,8 @@ export interface PropertyNFTInterface extends Interface {
       | "ownerOf"
       | "ownerProperties"
       | "properties"
+      | "propertiesByType"
+      | "propertiesByYearRange"
       | "renounceOwnership"
       | "safeTransferFrom(address,address,uint256)"
       | "safeTransferFrom(address,address,uint256,bytes)"
@@ -100,6 +153,18 @@ export interface PropertyNFTInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "getMultipleProperties",
+    values: [BigNumberish[]]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getOwnerPropertiesDetailed",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getPropertiesByType",
+    values: [string]
+  ): string;
+  encodeFunctionData(
     functionFragment: "isApprovedForAll",
     values: [AddressLike, AddressLike]
   ): string;
@@ -120,6 +185,14 @@ export interface PropertyNFTInterface extends Interface {
   encodeFunctionData(
     functionFragment: "properties",
     values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "propertiesByType",
+    values: [string, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "propertiesByYearRange",
+    values: [BigNumberish, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "renounceOwnership",
@@ -215,6 +288,18 @@ export interface PropertyNFTInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "getMultipleProperties",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getOwnerPropertiesDetailed",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getPropertiesByType",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "isApprovedForAll",
     data: BytesLike
   ): Result;
@@ -230,6 +315,14 @@ export interface PropertyNFTInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "properties", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "propertiesByType",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "propertiesByYearRange",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "renounceOwnership",
     data: BytesLike
@@ -528,6 +621,24 @@ export interface PropertyNFT extends BaseContract {
 
   getApproved: TypedContractMethod<[tokenId: BigNumberish], [string], "view">;
 
+  getMultipleProperties: TypedContractMethod<
+    [_tokenIds: BigNumberish[]],
+    [PropertyNFT.PropertySummaryStructOutput[]],
+    "view"
+  >;
+
+  getOwnerPropertiesDetailed: TypedContractMethod<
+    [_owner: AddressLike],
+    [PropertyNFT.PropertySummaryStructOutput[]],
+    "view"
+  >;
+
+  getPropertiesByType: TypedContractMethod<
+    [_propertyType: string],
+    [bigint[]],
+    "view"
+  >;
+
   isApprovedForAll: TypedContractMethod<
     [owner: AddressLike, operator: AddressLike],
     [boolean],
@@ -595,6 +706,18 @@ export interface PropertyNFT extends BaseContract {
         lastValuationUpdate: bigint;
       }
     ],
+    "view"
+  >;
+
+  propertiesByType: TypedContractMethod<
+    [arg0: string, arg1: BigNumberish],
+    [bigint],
+    "view"
+  >;
+
+  propertiesByYearRange: TypedContractMethod<
+    [arg0: BigNumberish, arg1: BigNumberish],
+    [bigint],
     "view"
   >;
 
@@ -722,6 +845,23 @@ export interface PropertyNFT extends BaseContract {
     nameOrSignature: "getApproved"
   ): TypedContractMethod<[tokenId: BigNumberish], [string], "view">;
   getFunction(
+    nameOrSignature: "getMultipleProperties"
+  ): TypedContractMethod<
+    [_tokenIds: BigNumberish[]],
+    [PropertyNFT.PropertySummaryStructOutput[]],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "getOwnerPropertiesDetailed"
+  ): TypedContractMethod<
+    [_owner: AddressLike],
+    [PropertyNFT.PropertySummaryStructOutput[]],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "getPropertiesByType"
+  ): TypedContractMethod<[_propertyType: string], [bigint[]], "view">;
+  getFunction(
     nameOrSignature: "isApprovedForAll"
   ): TypedContractMethod<
     [owner: AddressLike, operator: AddressLike],
@@ -792,6 +932,16 @@ export interface PropertyNFT extends BaseContract {
         lastValuationUpdate: bigint;
       }
     ],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "propertiesByType"
+  ): TypedContractMethod<[arg0: string, arg1: BigNumberish], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "propertiesByYearRange"
+  ): TypedContractMethod<
+    [arg0: BigNumberish, arg1: BigNumberish],
+    [bigint],
     "view"
   >;
   getFunction(

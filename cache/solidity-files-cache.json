@@ -39,8 +39,8 @@
       ]
     },
     "/Users/yosgi/freelancer/property-nft/contracts/PropertyNFT.sol": {
-      "lastModificationDate": 1748582822337,
-      "contentHash": "dc5b0139e8d2b5f91c719cc755f355a3",
+      "lastModificationDate": 1748595693164,
+      "contentHash": "ffd9acb0c78227665e551237db47d360",
       "sourceName": "contracts/PropertyNFT.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -771,7 +771,7 @@
       "artifacts": []
     },
     "/Users/yosgi/freelancer/property-nft/contracts/PropertyValuation.sol": {
-      "lastModificationDate": 1748582906981,
+      "lastModificationDate": 1748588887327,
       "contentHash": "9882523ed454878c673a5a3332d117a6",
       "sourceName": "contracts/PropertyValuation.sol",
       "solcConfig": {

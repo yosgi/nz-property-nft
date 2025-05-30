@@ -815,4 +815,6 @@ describe("PropertyNFT", function () {
       expect(historicalValues.length).to.equal(0);
     });
   });
+
+
 });

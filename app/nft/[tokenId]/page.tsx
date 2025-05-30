@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Share2, ArrowRight, ExternalLink, PlusCircle } from "lucide-react"
+import { Share2, ArrowRight, ExternalLink, PlusCircle, ArrowLeft, CheckCircle, XCircle } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -23,10 +23,9 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import contractArtifact from "../../../public/contracts/PropertyNFT.json"
 import valuationContractArtifact from "../../../public/contracts/PropertyValuation.json"
+import { useContract } from "../../contexts/ContractProvider"
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
-const VALUATION_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_VALUATION_ADDRESS || ""
-const ENS_REGISTRY = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e"
 
 const NZ_PROPERTY_TYPES = {
   "HOUSE": "House",
@@ -74,21 +73,21 @@ interface TransactionRecord {
 }
 
 interface PropertyData {
-  address: string
+  propertyAddress: string
   ownerName: string
   propertyType: string
-  renovationDate: number
+  renovationDate: bigint
   tokenURI: string
   isVerified: boolean
   estimatedValue: bigint
-  owner: string
-  latitude: number
-  longitude: number
-  // Add new fields for history records
-  valuationHistory: ValuationRecord[]
-  verificationHistory: VerificationRecord[]
-  transactionHistory: TransactionRecord[]
-  // Add more property details
+  currentOwner: string
+  latitude: bigint
+  longitude: bigint
+  verificationVotes: bigint
+  rejectionVotes: bigint
+  valuationHistory: any[]
+  verificationHistory: any[]
+  transactionHistory: any[]
   bedrooms?: number
   bathrooms?: number
   landArea?: number
@@ -108,146 +107,43 @@ interface TransferDetails {
 export default function NFTDetailPage() {
   const params = useParams()
   const tokenId = params.tokenId as string
+  console.log("tokenId",tokenId)
+  const { getProperty, transferNFT, submitVote, transactionPending, votingProperty, connect, estimateTransferGas } = useContract()
   const [property, setProperty] = useState<PropertyData | null>(null)
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [transferAddress, setTransferAddress] = useState("")
   const [isTransferring, setIsTransferring] = useState(false)
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
   const [transferDetails, setTransferDetails] = useState<TransferDetails | null>(null)
-  const [isConfirming, setIsConfirming] = useState(false)
+
+  const refreshProperty = async () => {
+    setError(null)
+    try {
+      // Ensure tokenId is valid
+      if (tokenId === undefined || tokenId === null) {
+        throw new Error("Invalid token ID")
+      }
+      const propertyData = await getProperty(tokenId)
+      setProperty(propertyData)
+      console.log("Property data:", propertyData)
+      setImageUrl(propertyData.imageURI)
+      
+    } catch (err) {
+      console.error("Error fetching property data:", err)
+      setError(err instanceof Error ? err.message : "Failed to fetch property data")
+    } 
+  }
 
   useEffect(() => {
-    const fetchPropertyData = async () => {
-      try {
-        if (!window.ethereum) {
-          throw new Error("Please install MetaMask to view NFT details")
-        }
-
-        const provider = new ethers.BrowserProvider(window.ethereum)
-        const contract = new ethers.Contract(CONTRACT_ADDRESS, contractArtifact.abi, provider)
-        const valuationContract = new ethers.Contract(VALUATION_CONTRACT_ADDRESS, valuationContractArtifact.abi, provider)
-
-        // Get property data
-        const propertyData = await contract.getProperty(tokenId)
-        const owner = await contract.ownerOf(tokenId)
-        const tokenURI = await contract.tokenURI(tokenId)
-
-        // Get valuation history
-        const valuationHistory = await valuationContract.getHistoricalValues(tokenId)
-        const formattedValuationHistory = valuationHistory.map((record: any) => ({
-          value: record.value,
-          timestamp: Number(record.timestamp),
-          locationScore: Number(record.locationScore),
-          areaScore: Number(record.areaScore),
-          conditionScore: Number(record.conditionScore),
-          ageScore: Number(record.ageScore),
-          renovationScore: Number(record.renovationScore),
-          updateReason: record.updateReason,
-          renovationDetails: record.renovationDetails,
-          renovationDate: record.renovationDate ? Number(record.renovationDate) : undefined
-        }))
-
-        // Create verification history from property data
-        const formattedVerificationHistory = [{
-          timestamp: Number(propertyData.renovationDate || 0),
-          status: propertyData.isVerified,
-          verifier: owner,
-          notes: `Property ${propertyData.isVerified ? 'verified' : 'unverified'}`
-        }]
-
-        // Get transfer events
-        const transferFilter = contract.filters.Transfer(null, null, tokenId)
-        const transferEvents = await contract.queryFilter(transferFilter)
-        const formattedTransactionHistory = transferEvents.map(event => {
-          const args = (event as ethers.EventLog).args
-          return {
-            timestamp: event.blockNumber,
-            from: args?.[0] as string,
-            to: args?.[1] as string,
-            transactionHash: event.transactionHash
-          }
-        })
-
-        // Convert IPFS URL to HTTP URL
-        if (tokenURI && tokenURI.startsWith('ipfs://')) {
-          const ipfsHash = tokenURI.replace('ipfs://', '')
-          setImageUrl(`https://gateway.pinata.cloud/ipfs/${ipfsHash}`)
-        }
-
-        setProperty({
-          address: propertyData.propertyAddress || "",
-          ownerName: propertyData.ownerName || "",
-          propertyType: propertyData.propertyType || "",
-          renovationDate: Number(propertyData.renovationDate || 0),
-          tokenURI: tokenURI || "",
-          isVerified: propertyData.isVerified || false,
-          estimatedValue: propertyData.estimatedValue || BigInt(0),
-          owner: owner,
-          latitude: Number(propertyData.latitude || 0),
-          longitude: Number(propertyData.longitude || 0),
-          valuationHistory: formattedValuationHistory,
-          verificationHistory: formattedVerificationHistory,
-          transactionHistory: formattedTransactionHistory,
-          bedrooms: Number(propertyData.bedrooms || 0),
-          bathrooms: Number(propertyData.bathrooms || 0),
-          landArea: Number(propertyData.landArea || 0),
-          buildingArea: Number(propertyData.buildingArea || 0),
-          yearBuilt: Number(propertyData.yearBuilt || 0),
-          lastSalePrice: propertyData.lastSalePrice || BigInt(0),
-          lastSaleDate: propertyData.lastSaleDate ? Number(propertyData.lastSaleDate) : undefined
-        })
-      } catch (err) {
-        console.error("Error fetching property data:", err)
-        setError(err instanceof Error ? err.message : "Failed to fetch property data")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchPropertyData()
+    refreshProperty()
   }, [tokenId])
 
-  const resolveENS = async (name: string): Promise<string | null> => {
-    try {
-      if (!window.ethereum) throw new Error("No ethereum provider found")
-      const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
-      const ensRegistry = new ethers.Contract(
-        ENS_REGISTRY,
-        [
-          "function resolver(bytes32 node) external view returns (address)",
-          "function name(bytes32 node) external view returns (string)",
-        ],
-        provider
-      )
-      const resolver = await ensRegistry.resolver(ethers.namehash(name))
-      if (resolver === ethers.ZeroAddress) return null
-      return resolver
-    } catch (err) {
-      console.error("Error resolving ENS:", err)
-      return null
+  useEffect(() => {
+    if (!transactionPending && votingProperty === tokenId) {
+      refreshProperty()
     }
-  }
-
-  const estimateGas = async (to: string): Promise<string> => {
-    try {
-      if (!window.ethereum) throw new Error("No ethereum provider found")
-      const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
-      const signer = await provider.getSigner()
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, contractArtifact.abi, signer)
-      const userAddress = await signer.getAddress()
-      
-      const gasEstimate = await contract.transferFrom.estimateGas(userAddress, to, tokenId)
-      const gasPrice = await provider.getFeeData()
-      const gasCost = gasEstimate * (gasPrice.gasPrice || BigInt(0))
-      
-      return ethers.formatEther(gasCost)
-    } catch (err) {
-      console.error("Error estimating gas:", err)
-      throw new Error("Failed to estimate gas cost")
-    }
-  }
+  }, [transactionPending, votingProperty])
 
   const handleAddressChange = async (address: string) => {
     setTransferAddress(address)
@@ -262,7 +158,6 @@ export default function NFTDetailPage() {
 
       // Check if input is ENS name
       if (address.endsWith('.eth')) {
-        if (!window.ethereum) throw new Error("No ethereum provider found")
         const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
         const resolved = await provider.resolveName(address)
         if (resolved) {
@@ -276,10 +171,10 @@ export default function NFTDetailPage() {
         return
       }
 
-      const gasEstimate = await estimateGas(resolvedAddress)
+      const gasEstimate = await estimateTransferGas(tokenId, resolvedAddress)
       setTransferDetails({
         recipient: resolvedAddress,
-        gasEstimate,
+        gasEstimate: ethers.formatEther(gasEstimate),
         isENS,
         ensName,
       })
@@ -296,24 +191,8 @@ export default function NFTDetailPage() {
 
     try {
       setIsTransferring(true)
-      if (!window.ethereum) {
-        throw new Error("Please install MetaMask to transfer NFT")
-      }
 
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, contractArtifact.abi, signer)
-
-      // Check if the user is the owner
-      const owner = await contract.ownerOf(tokenId)
-      const userAddress = await signer.getAddress()
-      
-      if (owner.toLowerCase() !== userAddress.toLowerCase()) {
-        throw new Error("You are not the owner of this NFT")
-      }
-
-      // Transfer the NFT
-      const tx = await contract.transferFrom(userAddress, transferDetails.recipient, tokenId)
+      const tx = await transferNFT(tokenId, transferDetails.recipient)
       toast.promise(tx.wait(), {
         loading: "Transferring NFT...",
         success: "NFT transferred successfully!",
@@ -326,32 +205,7 @@ export default function NFTDetailPage() {
       setTransferDetails(null)
       
       // Refresh property data
-      const propertyData = await contract.getProperty(tokenId)
-      const newOwner = await contract.ownerOf(tokenId)
-      const tokenURI = await contract.tokenURI(tokenId)
-
-      setProperty({
-        address: propertyData.propertyAddress || "",
-        ownerName: propertyData.ownerName || "",
-        propertyType: propertyData.propertyType || "",
-        renovationDate: Number(propertyData.renovationDate || 0),
-        tokenURI: tokenURI || "",
-        isVerified: propertyData.isVerified || false,
-        estimatedValue: propertyData.estimatedValue || BigInt(0),
-        owner: newOwner,
-        latitude: Number(propertyData.latitude || 0),
-        longitude: Number(propertyData.longitude || 0),
-        valuationHistory: property?.valuationHistory || [],
-        verificationHistory: property?.verificationHistory || [],
-        transactionHistory: property?.transactionHistory || [],
-        bedrooms: Number(propertyData.bedrooms || 0),
-        bathrooms: Number(propertyData.bathrooms || 0),
-        landArea: Number(propertyData.landArea || 0),
-        buildingArea: Number(propertyData.buildingArea || 0),
-        yearBuilt: Number(propertyData.yearBuilt || 0),
-        lastSalePrice: propertyData.lastSalePrice || BigInt(0),
-        lastSaleDate: propertyData.lastSaleDate ? Number(propertyData.lastSaleDate) : undefined
-      })
+      await refreshProperty()
     } catch (err) {
       console.error("Error transferring NFT:", err)
       toast.error(err instanceof Error ? err.message : "Failed to transfer NFT")
@@ -360,20 +214,30 @@ export default function NFTDetailPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
-      </div>
-    )
-  }
-
   if (error) {
     return (
       <div className="max-w-2xl mx-auto p-4">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {error}
+          {error === "Property not found" ? (
+            <>
+              <h2 className="font-bold mb-2">Property Not Found</h2>
+              <p>The property you're looking for doesn't exist or has been removed.</p>
+            </>
+          ) : error === "Contract not initialized" ? (
+            <>
+              <h2 className="font-bold mb-2">Wallet Not Connected</h2>
+              <p>Please connect your wallet to view property details.</p>
+            </>
+          ) : (
+            error
+          )}
         </div>
+        <Link href="/nft">
+          <Button variant="outline" className="mt-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to List
+          </Button>
+        </Link>
       </div>
     )
   }
@@ -389,12 +253,31 @@ export default function NFTDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
-      <div className="space-y-6">
+    <div className="max-w-2xl mx-auto p-4">
+      <Link href="/nft">
+        <Button variant="outline" className="mb-4">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to List
+        </Button>
+      </Link>
+
+      <div className="space-y-6 max-w-[600px] mx-auto relative">
+        {/* Loading Overlay */}
+        {(transactionPending) && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+              <p className="text-sm text-gray-600">
+                {transactionPending ? "Processing transaction..." : "Loading property data..."}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Property Header */}
         <div>
           <h1 className="text-3xl font-bold mb-2">Property NFT #{tokenId}</h1>
-          <p className="text-gray-600">{property.address}</p>
+          <p className="text-gray-600">{property.propertyAddress}</p>
           <div className="flex items-center gap-2 mt-2">
             <Badge variant={property.isVerified ? "default" : "secondary"}>
               {property.isVerified ? "Verified" : "Unverified"}
@@ -406,11 +289,11 @@ export default function NFTDetailPage() {
         </div>
 
         {/* Property Image */}
-        <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100">
+        <div className="relative aspect-[16/9] max-h-[300px] rounded-lg overflow-hidden bg-gray-100 w-full">
           {imageUrl ? (
             <img
               src={imageUrl}
-              alt={`Property at ${property.address}`}
+              alt={`Property at ${property.propertyAddress}`}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -419,6 +302,35 @@ export default function NFTDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Voting Buttons */}
+        {!property.isVerified && (
+          <div className="flex gap-2 w-full">
+            <Button
+              variant="outline"
+              className="flex-1 hover:bg-red-50 hover:text-red-700 hover:border-red-200"
+              onClick={() => submitVote(tokenId, false)}
+              disabled={transactionPending && votingProperty === tokenId}
+            >
+              <XCircle className="mr-2 h-4 w-4" />
+              {transactionPending && votingProperty === tokenId ? "Voting..." : "Reject"}
+              <Badge variant="outline" className="ml-2 bg-red-50 text-red-700 border-red-200">
+                {Number(property.rejectionVotes)  }
+              </Badge>
+            </Button>
+            <Button
+              className="flex-1 hover:bg-green-50 hover:text-green-700 hover:border-green-200"
+              onClick={() => submitVote(tokenId, true)}
+              disabled={transactionPending && votingProperty === tokenId}
+            >
+              <CheckCircle className="mr-2 h-4 w-4" />
+              {transactionPending && votingProperty === tokenId ? "Voting..." : "Approve"}
+              <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
+                {Number(property.verificationVotes)}
+              </Badge>
+            </Button>
+          </div>
+        )}
 
         {/* Property Details */}
         <Tabs defaultValue="details" className="w-full">
@@ -431,7 +343,7 @@ export default function NFTDetailPage() {
             <TabsTrigger value="blockchain">Blockchain</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="details">
+          <TabsContent value="details" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle>Property Details</CardTitle>
@@ -446,7 +358,7 @@ export default function NFTDetailPage() {
                 <div>
                   <h3 className="font-semibold">Last Renovation</h3>
                   <p className="text-gray-600">
-                    {new Date(property.renovationDate * 1000).toLocaleDateString()}
+                    {new Date(Number(property.renovationDate) * 1000).toLocaleDateString()}
                   </p>
                 </div>
                 <div>
@@ -458,10 +370,11 @@ export default function NFTDetailPage() {
                 <div>
                   <h3 className="font-semibold">Coordinates</h3>
                   <p className="text-gray-600">
-                    Latitude: {property.latitude / 1000000}°<br />
-                    Longitude: {property.longitude / 1000000}°
+                    Latitude: {Number(property.latitude) / 1000000}°<br />
+                    Longitude: {Number(property.longitude) / 1000000}°
                   </p>
                 </div>
+            
               </CardContent>
             </Card>
           </TabsContent>
@@ -478,7 +391,7 @@ export default function NFTDetailPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold">Owner Address</h3>
-                  <p className="text-gray-600 break-all">{property.owner}</p>
+                  <p className="text-gray-600 break-all">{property.currentOwner}</p>
                 </div>
               </CardContent>
             </Card>
