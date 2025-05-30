@@ -394,6 +394,7 @@ export default function SubmitPage() {
                 onValueChange={handleSelectChange} 
                 value={formData.propertyType}
                 required
+                name="propertyType"
               >
                 <SelectTrigger 
                   id="propertyType"

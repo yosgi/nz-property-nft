@@ -112,6 +112,29 @@ interface Property {
   }
 }
 
+// Add LoadingOverlay component
+const LoadingOverlay = ({ message }: { message: string }) => (
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center gap-4">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <p className="text-lg font-medium">{message}</p>
+    </div>
+  </div>
+)
+
+// Add ErrorOverlay component
+const ErrorOverlay = ({ message, onClose }: { message: string; onClose: () => void }) => (
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center gap-4 max-w-md">
+      <XCircle className="h-12 w-12 text-red-500" />
+      <p className="text-lg font-medium text-center">{message}</p>
+      <Button onClick={onClose} variant="outline">
+        Close
+      </Button>
+    </div>
+  </div>
+)
+
 export default function VerifyPage() {
   const [walletConnected, setWalletConnected] = useState(false)
   const [walletAddress, setWalletAddress] = useState("")
@@ -121,7 +144,7 @@ export default function VerifyPage() {
   const [transactionSuccess, setTransactionSuccess] = useState<string | null>(null)
   const [properties, setProperties] = useState<Property[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // Check wallet connection on mount
   useEffect(() => {
@@ -170,7 +193,7 @@ export default function VerifyPage() {
 
   const connectWallet = async () => {
     setIsConnecting(true)
-    setError(null)
+    setErrorMessage(null)
     try {
       if (!window.ethereum) {
         throw new Error("Please install MetaMask to view properties")
@@ -184,7 +207,8 @@ export default function VerifyPage() {
       await fetchProperties()
     } catch (err) {
       console.error("Error connecting wallet:", err)
-      setError(err instanceof Error ? err.message : "Failed to connect wallet")
+      const errorMsg = err instanceof Error ? err.message : "Failed to connect wallet"
+      setErrorMessage(errorMsg)
     } finally {
       setIsConnecting(false)
     }
@@ -192,7 +216,7 @@ export default function VerifyPage() {
 
   const fetchProperties = async () => {
     setLoading(true)
-    setError(null)
+    setErrorMessage(null)
     try {
       if (!window.ethereum) {
         throw new Error("Please install MetaMask to view properties")
@@ -264,7 +288,8 @@ export default function VerifyPage() {
       setProperties(propertiesData)
     } catch (err) {
       console.error("Error fetching properties:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch properties")
+      const errorMsg = err instanceof Error ? err.message : "Failed to fetch properties"
+      setErrorMessage(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -279,6 +304,7 @@ export default function VerifyPage() {
     try {
       setTransactionPending(true)
       setTransactionSuccess(null)
+      setErrorMessage(null)
 
       const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
       const signer = await provider.getSigner()
@@ -349,21 +375,24 @@ export default function VerifyPage() {
       await fetchProperties() // Refresh list
     } catch (error) {
       console.error("Error voting:", error)
+      const errorMsg = error instanceof Error ? error.message : "Failed to submit vote"
+      setErrorMessage(errorMsg)
+      toast.error(errorMsg)
+    } finally {
       setTransactionPending(false)
-      toast.error((error as Error).message || "Failed to submit vote")
     }
   }
 
   const confirmValuationUpdate = async (propertyId: string) => {
     if (!walletConnected) {
-      setError("Please connect your wallet to confirm valuation")
+      setErrorMessage("Please connect your wallet to confirm valuation")
       return
     }
 
     setVotingProperty(propertyId)
     setTransactionPending(true)
     setTransactionSuccess(null)
-    setError(null)
+    setErrorMessage(null)
 
     try {
       const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
@@ -376,8 +405,6 @@ export default function VerifyPage() {
         throw new Error("Invalid property ID")
       }
 
-      console.log("Before confirmation - Property state:", properties.find(p => p.id === propertyId))
-
       // Confirm the valuation update
       const tx = await valuationContract.confirmValuationUpdate(propertyIdNum)
       await tx.wait()
@@ -389,8 +416,9 @@ export default function VerifyPage() {
       toast.success("Valuation update confirmed successfully")
     } catch (err) {
       console.error("Error confirming valuation:", err)
-      setError(err instanceof Error ? err.message : "Failed to confirm valuation")
-      toast.error("Failed to confirm valuation")
+      const errorMsg = err instanceof Error ? err.message : "Failed to confirm valuation"
+      setErrorMessage(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setTransactionPending(false)
       setVotingProperty(null)
@@ -420,20 +448,23 @@ export default function VerifyPage() {
     )
   }
 
-  if (error) {
+  if (errorMessage) {
     return (
-      <div className="max-w-7xl mx-auto p-4">
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      </div>
+      <ErrorOverlay 
+        message={errorMessage} 
+        onClose={() => setErrorMessage(null)} 
+      />
     )
   }
 
   return (
     <div className="space-y-6">
+      {transactionPending && (
+        <LoadingOverlay message="Processing blockchain transaction..." />
+      )}
+      {loading && (
+        <LoadingOverlay message="Loading properties..." />
+      )}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Community Verification</h1>
 

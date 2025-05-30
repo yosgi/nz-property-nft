@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from "recharts"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle, Wallet } from "lucide-react"
+import { AlertTriangle, Wallet, CheckCircle, XCircle, Check, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import contractArtifact from "../../public/contracts/PropertyNFT.json"
 import valuationContractArtifact from "../../public/contracts/PropertyValuation.json"
@@ -80,6 +80,29 @@ const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
   return null
 }
 
+// Add LoadingOverlay component
+const LoadingOverlay = ({ message }: { message: string }) => (
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center gap-4">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <p className="text-lg font-medium">{message}</p>
+    </div>
+  </div>
+)
+
+// Add ErrorOverlay component
+const ErrorOverlay = ({ message, onClose }: { message: string; onClose: () => void }) => (
+  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center gap-4 max-w-md">
+      <XCircle className="h-12 w-12 text-red-500" />
+      <p className="text-lg font-medium text-center">{message}</p>
+      <Button onClick={onClose} variant="outline">
+        Close
+      </Button>
+    </div>
+  </div>
+)
+
 export default function ValuationPage() {
   const [walletConnected, setWalletConnected] = useState(false)
   const [walletAddress, setWalletAddress] = useState<string>("")
@@ -93,6 +116,8 @@ export default function ValuationPage() {
   const [ownedProperties, setOwnedProperties] = useState<{id: string, address: string}[]>([])
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>("")
   const [isConfirming, setIsConfirming] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [transactionPending, setTransactionPending] = useState(false)
 
   // Check wallet connection on mount
   useEffect(() => {
@@ -143,7 +168,7 @@ export default function ValuationPage() {
 
   const connectWallet = async () => {
     setIsConnecting(true)
-    setError(null)
+    setErrorMessage(null)
     try {
       if (!window.ethereum) {
         throw new Error("Please install MetaMask to view valuations")
@@ -157,15 +182,17 @@ export default function ValuationPage() {
       await fetchValuationData()
     } catch (err) {
       console.error("Error connecting wallet:", err)
-      setError(err instanceof Error ? err.message : "Failed to connect wallet")
-      setWalletConnected(false)
-      setWalletAddress("")
+      const errorMsg = err instanceof Error ? err.message : "Failed to connect wallet"
+      setErrorMessage(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setIsConnecting(false)
     }
   }
 
   const fetchValuationData = async () => {
+    setLoading(true)
+    setErrorMessage(null)
     try {
       if (!window.ethereum) {
         throw new Error("Please install MetaMask to view valuations")
@@ -318,7 +345,9 @@ export default function ValuationPage() {
       })
     } catch (err) {
       console.error("Error fetching valuation data:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch valuation data")
+      const errorMsg = err instanceof Error ? err.message : "Failed to fetch valuation data"
+      setErrorMessage(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -327,8 +356,8 @@ export default function ValuationPage() {
   const handleUpdateValuation = async () => {
     if (!newValuation || !walletConnected || !valuationData) return
 
-    setIsUpdating(true)
-    setError(null)
+    setTransactionPending(true)
+    setErrorMessage(null)
 
     try {
       if (!window.ethereum) {
@@ -362,10 +391,11 @@ export default function ValuationPage() {
       await fetchValuationData()
     } catch (err) {
       console.error("Error updating valuation:", err)
-      setError(err instanceof Error ? err.message : "Failed to update valuation")
-      toast.error("Failed to update valuation")
+      const errorMsg = err instanceof Error ? err.message : "Failed to update valuation"
+      setErrorMessage(errorMsg)
+      toast.error(errorMsg)
     } finally {
-      setIsUpdating(false)
+      setTransactionPending(false)
     }
   }
 
@@ -426,8 +456,8 @@ export default function ValuationPage() {
   const handleConfirmValuation = async () => {
     if (!walletConnected || !valuationData) return
 
-    setIsConfirming(true)
-    setError(null)
+    setTransactionPending(true)
+    setErrorMessage(null)
 
     try {
       if (!window.ethereum) {
@@ -479,37 +509,32 @@ export default function ValuationPage() {
       await fetchValuationData() // Refresh the valuation data
     } catch (err) {
       console.error("Error confirming valuation:", err)
-      if (err instanceof Error) {
-        console.error("Error details:", {
-          message: err.message,
-          code: (err as any).code,
-          data: (err as any).data
-        })
-      }
-      setError(err instanceof Error ? err.message : "Failed to confirm valuation")
-      toast.error("Failed to confirm valuation")
+      const errorMsg = err instanceof Error ? err.message : "Failed to confirm valuation"
+      setErrorMessage(errorMsg)
+      toast.error(errorMsg)
     } finally {
-      setIsConfirming(false)
+      setTransactionPending(false)
     }
+  }
+
+  if (transactionPending) {
+    return (
+      <LoadingOverlay message="Processing blockchain transaction..." />
+    )
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
-      </div>
+      <LoadingOverlay message="Loading valuation data..." />
     )
   }
 
-  if (error) {
+  if (errorMessage) {
     return (
-      <div className="max-w-7xl mx-auto p-4">
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      </div>
+      <ErrorOverlay 
+        message={errorMessage} 
+        onClose={() => setErrorMessage(null)} 
+      />
     )
   }
 
