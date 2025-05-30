@@ -16,6 +16,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { Slider } from "@/components/ui/slider"
+import { Textarea } from "@/components/ui/textarea"
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
 const VALUATION_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_VALUATION_ADDRESS || ""
@@ -118,6 +120,14 @@ export default function ValuationPage() {
   const [isConfirming, setIsConfirming] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [transactionPending, setTransactionPending] = useState(false)
+  const [updateReason, setUpdateReason] = useState("")
+  const [renovationDetails, setRenovationDetails] = useState("")
+  const [renovationDate, setRenovationDate] = useState("")
+  const [locationScore, setLocationScore] = useState(valuationData?.factors[0].score || 0)
+  const [sizeScore, setSizeScore] = useState(valuationData?.factors[1].score || 0)
+  const [conditionScore, setConditionScore] = useState(valuationData?.factors[2].score || 0)
+  const [ageScore, setAgeScore] = useState(valuationData?.factors[3].score || 0)
+  const [renovationScore, setRenovationScore] = useState(valuationData?.factors[4].score || 0)
 
   // Check wallet connection on mount
   useEffect(() => {
@@ -377,17 +387,20 @@ export default function ValuationPage() {
         selectedPropertyId,
         valuationInWei,
         valuationInWei,
-        valuationData.factors[0].score,
-        valuationData.factors[1].score,
-        valuationData.factors[2].score,
-        valuationData.factors[3].score,
-        valuationData.factors[4].score
+        locationScore,
+        sizeScore,
+        conditionScore,
+        ageScore,
+        renovationScore
       )
       await tx.wait()
 
       toast.success("Property valuation submitted for verification")
       setIsUpdateDialogOpen(false)
       setNewValuation("")
+      setUpdateReason("")
+      setRenovationDetails("")
+      setRenovationDate("")
       await fetchValuationData()
     } catch (err) {
       console.error("Error updating valuation:", err)
@@ -640,7 +653,7 @@ export default function ValuationPage() {
       )}
 
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Update Property Valuation</DialogTitle>
             <DialogDescription>
@@ -659,6 +672,88 @@ export default function ValuationPage() {
                 onChange={(e) => setNewValuation(e.target.value)}
               />
             </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="updateReason">Reason for Update</Label>
+              <Textarea
+                id="updateReason"
+                placeholder="Enter the reason for this valuation update"
+                value={updateReason}
+                onChange={(e) => setUpdateReason(e.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="renovationDetails">Renovation Details</Label>
+              <Textarea
+                id="renovationDetails"
+                placeholder="Describe any renovations or improvements made to the property"
+                value={renovationDetails}
+                onChange={(e) => setRenovationDetails(e.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="renovationDate">Renovation Date</Label>
+              <Input
+                id="renovationDate"
+                type="date"
+                value={renovationDate}
+                onChange={(e) => setRenovationDate(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label>Location Score: {locationScore}</Label>
+                <Slider
+                  value={[locationScore]}
+                  onValueChange={(value) => setLocationScore(value[0])}
+                  max={100}
+                  step={1}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Property Size Score: {sizeScore}</Label>
+                <Slider
+                  value={[sizeScore]}
+                  onValueChange={(value) => setSizeScore(value[0])}
+                  max={100}
+                  step={1}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Condition Score: {conditionScore}</Label>
+                <Slider
+                  value={[conditionScore]}
+                  onValueChange={(value) => setConditionScore(value[0])}
+                  max={100}
+                  step={1}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Age Score: {ageScore}</Label>
+                <Slider
+                  value={[ageScore]}
+                  onValueChange={(value) => setAgeScore(value[0])}
+                  max={100}
+                  step={1}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Renovation Score: {renovationScore}</Label>
+                <Slider
+                  value={[renovationScore]}
+                  onValueChange={(value) => setRenovationScore(value[0])}
+                  max={100}
+                  step={1}
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -666,6 +761,9 @@ export default function ValuationPage() {
               onClick={() => {
                 setIsUpdateDialogOpen(false)
                 setNewValuation("")
+                setUpdateReason("")
+                setRenovationDetails("")
+                setRenovationDate("")
               }}
             >
               Cancel
