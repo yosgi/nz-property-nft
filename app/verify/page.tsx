@@ -401,35 +401,85 @@ export default function VerifyPage() {
       setErrorMessage("Please connect your wallet to confirm valuation")
       return
     }
-
+  
     setVotingProperty(propertyId)
     setTransactionPending(true)
     setTransactionSuccess(null)
     setErrorMessage(null)
-
+  
     try {
       const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
       const signer = await provider.getSigner()
       const valuationContract = new ethers.Contract(VALUATION_CONTRACT_ADDRESS, valuationContractArtifact.abi, signer)
-
-      // Convert propertyId to number
+      const nftContract = new ethers.Contract(CONTRACT_ADDRESS, contractArtifact.abi, signer)
+  
       const propertyIdNum = parseInt(propertyId)
       if (isNaN(propertyIdNum)) {
         throw new Error("Invalid property ID")
       }
-
-      // Confirm the valuation update
-      const tx = await valuationContract.confirmValuationUpdate(propertyIdNum)
-      await tx.wait()
-
-      // Fetch fresh data after confirmation
+  
+      // 获取pending valuation
+      const pendingValuation = await valuationContract.getPendingValuation(propertyIdNum)
+      console.log("Current pending valuation:", pendingValuation)
+  
+      if (!pendingValuation.isVerified) {
+        throw new Error("Valuation must be verified before confirmation")
+      }
+  
+      if (pendingValuation.estimatedValue <= 0) {
+        throw new Error("Invalid valuation amount")
+      }
+  
+      // 检查是否是属性所有者
+      const propertyOwner = await nftContract.ownerOf(propertyIdNum)
+      const userAddress = await signer.getAddress()
+      if (propertyOwner.toLowerCase() !== userAddress.toLowerCase()) {
+        throw new Error("Only property owner can confirm valuation updates")
+      }
+  
+      // 检查PropertyNFT合约的owner是否是PropertyValuation合约
+      const nftContractOwner = await nftContract.owner()
+      console.log("NFT Contract Owner:", nftContractOwner)
+      console.log("Valuation Contract Address:", VALUATION_CONTRACT_ADDRESS)
+      
+      if (nftContractOwner.toLowerCase() !== VALUATION_CONTRACT_ADDRESS.toLowerCase()) {
+        // 如果没有授权，显示授权按钮
+        throw new Error("NEEDS_AUTHORIZATION")
+      }
+  
+      // 如果已经授权，直接调用confirmValuationUpdate
+      console.log("Confirming valuation update...")
+      const tx = await valuationContract.confirmValuationUpdate(propertyIdNum, {
+        gasLimit: 500000 // 增加gas limit以防不够
+      })
+      console.log("Transaction sent:", tx.hash)
+      
+      const receipt = await tx.wait()
+      console.log("Transaction confirmed:", receipt)
+  
+      // 刷新数据
       await fetchProperties()
-
+  
       setTransactionSuccess("confirmed")
       toast.success("Valuation update confirmed successfully")
     } catch (err) {
       console.error("Error confirming valuation:", err)
-      const errorMsg = err instanceof Error ? err.message : "Failed to confirm valuation"
+      
+      let errorMsg = "Failed to confirm valuation"
+      if (err instanceof Error) {
+        if (err.message === "NEEDS_AUTHORIZATION") {
+          // 特殊处理需要授权的情况
+          setErrorMessage("NEEDS_AUTHORIZATION")
+          return
+        } else if (err.message.includes("Not authorized")) {
+          errorMsg = "The valuation contract needs to be authorized first"
+        } else if (err.message.includes("Valuation not verified")) {
+          errorMsg = "This valuation has not been verified by the community yet"
+        } else {
+          errorMsg = err.message
+        }
+      }
+      
       setErrorMessage(errorMsg)
       toast.error(errorMsg)
     } finally {

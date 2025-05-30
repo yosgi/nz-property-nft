@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import contractArtifact from "../../../public/contracts/PropertyNFT.json"
+import valuationContractArtifact from "../../../public/contracts/PropertyValuation.json"
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
 const VALUATION_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_VALUATION_ADDRESS || ""
@@ -42,6 +43,36 @@ const NZ_PROPERTY_TYPES = {
   "BACH": "Bach/Holiday Home"
 } as const
 
+// Interface for property valuation history
+interface ValuationRecord {
+  value: bigint
+  timestamp: number
+  locationScore: number
+  areaScore: number
+  conditionScore: number
+  ageScore: number
+  renovationScore: number
+  updateReason?: string
+  renovationDetails?: string
+  renovationDate?: number
+}
+
+// Interface for verification history
+interface VerificationRecord {
+  timestamp: number
+  status: boolean
+  verifier: string
+  notes?: string
+}
+
+// Interface for transaction history
+interface TransactionRecord {
+  timestamp: number
+  from: string
+  to: string
+  transactionHash: string
+}
+
 interface PropertyData {
   address: string
   ownerName: string
@@ -53,6 +84,18 @@ interface PropertyData {
   owner: string
   latitude: number
   longitude: number
+  // Add new fields for history records
+  valuationHistory: ValuationRecord[]
+  verificationHistory: VerificationRecord[]
+  transactionHistory: TransactionRecord[]
+  // Add more property details
+  bedrooms?: number
+  bathrooms?: number
+  landArea?: number
+  buildingArea?: number
+  yearBuilt?: number
+  lastSalePrice?: bigint
+  lastSaleDate?: number
 }
 
 interface TransferDetails {
@@ -84,17 +127,48 @@ export default function NFTDetailPage() {
 
         const provider = new ethers.BrowserProvider(window.ethereum)
         const contract = new ethers.Contract(CONTRACT_ADDRESS, contractArtifact.abi, provider)
+        const valuationContract = new ethers.Contract(VALUATION_CONTRACT_ADDRESS, valuationContractArtifact.abi, provider)
 
         // Get property data
         const propertyData = await contract.getProperty(tokenId)
-        console.log("Property Data from Contract:", propertyData) // Debug log
-
-        // Get owner
         const owner = await contract.ownerOf(tokenId)
-
-        // Get token URI
         const tokenURI = await contract.tokenURI(tokenId)
-        console.log("Token URI:", tokenURI) // Debug log
+
+        // Get valuation history
+        const valuationHistory = await valuationContract.getHistoricalValues(tokenId)
+        const formattedValuationHistory = valuationHistory.map((record: any) => ({
+          value: record.value,
+          timestamp: Number(record.timestamp),
+          locationScore: Number(record.locationScore),
+          areaScore: Number(record.areaScore),
+          conditionScore: Number(record.conditionScore),
+          ageScore: Number(record.ageScore),
+          renovationScore: Number(record.renovationScore),
+          updateReason: record.updateReason,
+          renovationDetails: record.renovationDetails,
+          renovationDate: record.renovationDate ? Number(record.renovationDate) : undefined
+        }))
+
+        // Create verification history from property data
+        const formattedVerificationHistory = [{
+          timestamp: Number(propertyData.renovationDate || 0),
+          status: propertyData.isVerified,
+          verifier: owner,
+          notes: `Property ${propertyData.isVerified ? 'verified' : 'unverified'}`
+        }]
+
+        // Get transfer events
+        const transferFilter = contract.filters.Transfer(null, null, tokenId)
+        const transferEvents = await contract.queryFilter(transferFilter)
+        const formattedTransactionHistory = transferEvents.map(event => {
+          const args = (event as ethers.EventLog).args
+          return {
+            timestamp: event.blockNumber,
+            from: args?.[0] as string,
+            to: args?.[1] as string,
+            transactionHash: event.transactionHash
+          }
+        })
 
         // Convert IPFS URL to HTTP URL
         if (tokenURI && tokenURI.startsWith('ipfs://')) {
@@ -110,9 +184,19 @@ export default function NFTDetailPage() {
           tokenURI: tokenURI || "",
           isVerified: propertyData.isVerified || false,
           estimatedValue: propertyData.estimatedValue || BigInt(0),
-          owner,
+          owner: owner,
           latitude: Number(propertyData.latitude || 0),
           longitude: Number(propertyData.longitude || 0),
+          valuationHistory: formattedValuationHistory,
+          verificationHistory: formattedVerificationHistory,
+          transactionHistory: formattedTransactionHistory,
+          bedrooms: Number(propertyData.bedrooms || 0),
+          bathrooms: Number(propertyData.bathrooms || 0),
+          landArea: Number(propertyData.landArea || 0),
+          buildingArea: Number(propertyData.buildingArea || 0),
+          yearBuilt: Number(propertyData.yearBuilt || 0),
+          lastSalePrice: propertyData.lastSalePrice || BigInt(0),
+          lastSaleDate: propertyData.lastSaleDate ? Number(propertyData.lastSaleDate) : undefined
         })
       } catch (err) {
         console.error("Error fetching property data:", err)
@@ -257,6 +341,16 @@ export default function NFTDetailPage() {
         owner: newOwner,
         latitude: Number(propertyData.latitude || 0),
         longitude: Number(propertyData.longitude || 0),
+        valuationHistory: property?.valuationHistory || [],
+        verificationHistory: property?.verificationHistory || [],
+        transactionHistory: property?.transactionHistory || [],
+        bedrooms: Number(propertyData.bedrooms || 0),
+        bathrooms: Number(propertyData.bathrooms || 0),
+        landArea: Number(propertyData.landArea || 0),
+        buildingArea: Number(propertyData.buildingArea || 0),
+        yearBuilt: Number(propertyData.yearBuilt || 0),
+        lastSalePrice: propertyData.lastSalePrice || BigInt(0),
+        lastSaleDate: propertyData.lastSaleDate ? Number(propertyData.lastSaleDate) : undefined
       })
     } catch (err) {
       console.error("Error transferring NFT:", err)
@@ -328,9 +422,12 @@ export default function NFTDetailPage() {
 
         {/* Property Details */}
         <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="ownership">Ownership</TabsTrigger>
+            <TabsTrigger value="valuation">Valuation</TabsTrigger>
+            <TabsTrigger value="verification">Verification</TabsTrigger>
+            <TabsTrigger value="transactions">Transactions</TabsTrigger>
             <TabsTrigger value="blockchain">Blockchain</TabsTrigger>
           </TabsList>
 
@@ -383,6 +480,120 @@ export default function NFTDetailPage() {
                   <h3 className="font-semibold">Owner Address</h3>
                   <p className="text-gray-600 break-all">{property.owner}</p>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="valuation">
+            <Card>
+              <CardHeader>
+                <CardTitle>Valuation History</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {property?.valuationHistory?.map((record, index) => (
+                  <div key={index} className="border-b pb-4 last:border-0">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h3 className="font-semibold">
+                          {ethers.formatEther(record.value.toString())} ETH
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          {new Date(record.timestamp * 1000).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <span>Location Score:</span>
+                          <span>{record.locationScore}</span>
+                          <span>Area Score:</span>
+                          <span>{record.areaScore}</span>
+                          <span>Condition Score:</span>
+                          <span>{record.conditionScore}</span>
+                          <span>Age Score:</span>
+                          <span>{record.ageScore}</span>
+                          <span>Renovation Score:</span>
+                          <span>{record.renovationScore}</span>
+                        </div>
+                      </div>
+                    </div>
+                    {record.updateReason && (
+                      <p className="text-sm text-gray-600 mt-2">
+                        <span className="font-medium">Update Reason:</span> {record.updateReason}
+                      </p>
+                    )}
+                    {record.renovationDetails && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        <span className="font-medium">Renovation Details:</span> {record.renovationDetails}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="verification">
+            <Card>
+              <CardHeader>
+                <CardTitle>Verification History</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {property?.verificationHistory?.map((record, index) => (
+                  <div key={index} className="border-b pb-4 last:border-0">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <Badge variant={record.status ? "default" : "secondary"}>
+                          {record.status ? "Verified" : "Unverified"}
+                        </Badge>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {new Date(record.timestamp * 1000).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600 break-all">
+                          Verifier: {record.verifier}
+                        </p>
+                        {record.notes && (
+                          <p className="text-sm text-gray-600 mt-1">{record.notes}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="transactions">
+            <Card>
+              <CardHeader>
+                <CardTitle>Transaction History</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {property?.transactionHistory?.map((record, index) => (
+                  <div key={index} className="border-b pb-4 last:border-0">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-sm text-gray-600">
+                          From: {record.from}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          To: {record.to}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {new Date(record.timestamp * 1000).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.open(`https://etherscan.io/tx/${record.transactionHash}`, '_blank')}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           </TabsContent>

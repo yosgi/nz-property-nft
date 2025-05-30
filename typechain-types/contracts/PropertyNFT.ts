@@ -30,14 +30,11 @@ export interface PropertyNFTInterface extends Interface {
       | "VERIFICATION_THRESHOLD"
       | "addressExists"
       | "approve"
+      | "authorizedContracts"
       | "balanceOf"
       | "getApproved"
-      | "getOwnerProperties"
-      | "getProperty"
-      | "getTotalProperties"
-      | "getUnverifiedProperties"
-      | "hasUserVoted"
       | "isApprovedForAll"
+      | "isAuthorizedContract"
       | "name"
       | "owner"
       | "ownerOf"
@@ -47,12 +44,14 @@ export interface PropertyNFTInterface extends Interface {
       | "safeTransferFrom(address,address,uint256)"
       | "safeTransferFrom(address,address,uint256,bytes)"
       | "setApprovalForAll"
+      | "setAuthorizedContract"
       | "submitProperty"
       | "supportsInterface"
       | "symbol"
       | "tokenURI"
       | "transferFrom"
       | "transferOwnership"
+      | "updatePropertyValuation"
       | "updatePropertyValue"
       | "voteOnProperty"
   ): FunctionFragment;
@@ -62,6 +61,7 @@ export interface PropertyNFTInterface extends Interface {
       | "Approval"
       | "ApprovalForAll"
       | "BatchMetadataUpdate"
+      | "ContractAuthorized"
       | "MetadataUpdate"
       | "OwnershipTransferred"
       | "PropertySubmitted"
@@ -88,6 +88,10 @@ export interface PropertyNFTInterface extends Interface {
     values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "authorizedContracts",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "balanceOf",
     values: [AddressLike]
   ): string;
@@ -96,28 +100,12 @@ export interface PropertyNFTInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "getOwnerProperties",
-    values: [AddressLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getProperty",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getTotalProperties",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "getUnverifiedProperties",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
-    functionFragment: "hasUserVoted",
-    values: [BigNumberish, AddressLike]
-  ): string;
-  encodeFunctionData(
     functionFragment: "isApprovedForAll",
     values: [AddressLike, AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "isAuthorizedContract",
+    values: [AddressLike]
   ): string;
   encodeFunctionData(functionFragment: "name", values?: undefined): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
@@ -150,6 +138,10 @@ export interface PropertyNFTInterface extends Interface {
     values: [AddressLike, boolean]
   ): string;
   encodeFunctionData(
+    functionFragment: "setAuthorizedContract",
+    values: [AddressLike, boolean]
+  ): string;
+  encodeFunctionData(
     functionFragment: "submitProperty",
     values: [
       string,
@@ -179,6 +171,19 @@ export interface PropertyNFTInterface extends Interface {
     values: [AddressLike]
   ): string;
   encodeFunctionData(
+    functionFragment: "updatePropertyValuation",
+    values: [
+      BigNumberish,
+      BigNumberish,
+      BigNumberish,
+      BigNumberish,
+      BigNumberish,
+      BigNumberish,
+      BigNumberish,
+      BigNumberish
+    ]
+  ): string;
+  encodeFunctionData(
     functionFragment: "updatePropertyValue",
     values: [BigNumberish, BigNumberish]
   ): string;
@@ -200,33 +205,21 @@ export interface PropertyNFTInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "approve", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "authorizedContracts",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "balanceOf", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "getApproved",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "getOwnerProperties",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getProperty",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getTotalProperties",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "getUnverifiedProperties",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "hasUserVoted",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "isApprovedForAll",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "isAuthorizedContract",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "name", data: BytesLike): Result;
@@ -254,6 +247,10 @@ export interface PropertyNFTInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "setAuthorizedContract",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "submitProperty",
     data: BytesLike
   ): Result;
@@ -269,6 +266,10 @@ export interface PropertyNFTInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "transferOwnership",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "updatePropertyValuation",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -330,6 +331,19 @@ export namespace BatchMetadataUpdateEvent {
   export interface OutputObject {
     _fromTokenId: bigint;
     _toTokenId: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace ContractAuthorizedEvent {
+  export type InputTuple = [contractAddress: AddressLike, authorized: boolean];
+  export type OutputTuple = [contractAddress: string, authorized: boolean];
+  export interface OutputObject {
+    contractAddress: string;
+    authorized: boolean;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -504,60 +518,24 @@ export interface PropertyNFT extends BaseContract {
     "nonpayable"
   >;
 
-  balanceOf: TypedContractMethod<[owner: AddressLike], [bigint], "view">;
-
-  getApproved: TypedContractMethod<[tokenId: BigNumberish], [string], "view">;
-
-  getOwnerProperties: TypedContractMethod<
-    [_owner: AddressLike],
-    [bigint[]],
-    "view"
-  >;
-
-  getProperty: TypedContractMethod<
-    [_tokenId: BigNumberish],
-    [
-      [
-        string,
-        string,
-        string,
-        bigint,
-        string,
-        bigint,
-        bigint,
-        boolean,
-        bigint,
-        bigint,
-        bigint
-      ] & {
-        propertyAddress: string;
-        ownerName: string;
-        propertyType: string;
-        renovationDate: bigint;
-        imageURI: string;
-        latitude: bigint;
-        longitude: bigint;
-        isVerified: boolean;
-        estimatedValue: bigint;
-        verificationVotes: bigint;
-        rejectionVotes: bigint;
-      }
-    ],
-    "view"
-  >;
-
-  getTotalProperties: TypedContractMethod<[], [bigint], "view">;
-
-  getUnverifiedProperties: TypedContractMethod<[], [bigint[]], "view">;
-
-  hasUserVoted: TypedContractMethod<
-    [_tokenId: BigNumberish, _user: AddressLike],
+  authorizedContracts: TypedContractMethod<
+    [arg0: AddressLike],
     [boolean],
     "view"
   >;
 
+  balanceOf: TypedContractMethod<[owner: AddressLike], [bigint], "view">;
+
+  getApproved: TypedContractMethod<[tokenId: BigNumberish], [string], "view">;
+
   isApprovedForAll: TypedContractMethod<
     [owner: AddressLike, operator: AddressLike],
+    [boolean],
+    "view"
+  >;
+
+  isAuthorizedContract: TypedContractMethod<
+    [_contract: AddressLike],
     [boolean],
     "view"
   >;
@@ -588,6 +566,13 @@ export interface PropertyNFT extends BaseContract {
         boolean,
         bigint,
         bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
         bigint
       ] & {
         propertyAddress: string;
@@ -601,6 +586,13 @@ export interface PropertyNFT extends BaseContract {
         estimatedValue: bigint;
         verificationVotes: bigint;
         rejectionVotes: bigint;
+        locationScore: bigint;
+        sizeScore: bigint;
+        conditionScore: bigint;
+        ageScore: bigint;
+        renovationScore: bigint;
+        comparableValue: bigint;
+        lastValuationUpdate: bigint;
       }
     ],
     "view"
@@ -627,6 +619,12 @@ export interface PropertyNFT extends BaseContract {
 
   setApprovalForAll: TypedContractMethod<
     [operator: AddressLike, approved: boolean],
+    [void],
+    "nonpayable"
+  >;
+
+  setAuthorizedContract: TypedContractMethod<
+    [_contract: AddressLike, _authorized: boolean],
     [void],
     "nonpayable"
   >;
@@ -667,6 +665,21 @@ export interface PropertyNFT extends BaseContract {
     "nonpayable"
   >;
 
+  updatePropertyValuation: TypedContractMethod<
+    [
+      _tokenId: BigNumberish,
+      _estimatedValue: BigNumberish,
+      _comparableValue: BigNumberish,
+      _locationScore: BigNumberish,
+      _sizeScore: BigNumberish,
+      _conditionScore: BigNumberish,
+      _ageScore: BigNumberish,
+      _renovationScore: BigNumberish
+    ],
+    [void],
+    "nonpayable"
+  >;
+
   updatePropertyValue: TypedContractMethod<
     [_tokenId: BigNumberish, _newValue: BigNumberish],
     [void],
@@ -700,60 +713,14 @@ export interface PropertyNFT extends BaseContract {
     "nonpayable"
   >;
   getFunction(
+    nameOrSignature: "authorizedContracts"
+  ): TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
+  getFunction(
     nameOrSignature: "balanceOf"
   ): TypedContractMethod<[owner: AddressLike], [bigint], "view">;
   getFunction(
     nameOrSignature: "getApproved"
   ): TypedContractMethod<[tokenId: BigNumberish], [string], "view">;
-  getFunction(
-    nameOrSignature: "getOwnerProperties"
-  ): TypedContractMethod<[_owner: AddressLike], [bigint[]], "view">;
-  getFunction(
-    nameOrSignature: "getProperty"
-  ): TypedContractMethod<
-    [_tokenId: BigNumberish],
-    [
-      [
-        string,
-        string,
-        string,
-        bigint,
-        string,
-        bigint,
-        bigint,
-        boolean,
-        bigint,
-        bigint,
-        bigint
-      ] & {
-        propertyAddress: string;
-        ownerName: string;
-        propertyType: string;
-        renovationDate: bigint;
-        imageURI: string;
-        latitude: bigint;
-        longitude: bigint;
-        isVerified: boolean;
-        estimatedValue: bigint;
-        verificationVotes: bigint;
-        rejectionVotes: bigint;
-      }
-    ],
-    "view"
-  >;
-  getFunction(
-    nameOrSignature: "getTotalProperties"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "getUnverifiedProperties"
-  ): TypedContractMethod<[], [bigint[]], "view">;
-  getFunction(
-    nameOrSignature: "hasUserVoted"
-  ): TypedContractMethod<
-    [_tokenId: BigNumberish, _user: AddressLike],
-    [boolean],
-    "view"
-  >;
   getFunction(
     nameOrSignature: "isApprovedForAll"
   ): TypedContractMethod<
@@ -761,6 +728,9 @@ export interface PropertyNFT extends BaseContract {
     [boolean],
     "view"
   >;
+  getFunction(
+    nameOrSignature: "isAuthorizedContract"
+  ): TypedContractMethod<[_contract: AddressLike], [boolean], "view">;
   getFunction(
     nameOrSignature: "name"
   ): TypedContractMethod<[], [string], "view">;
@@ -793,6 +763,13 @@ export interface PropertyNFT extends BaseContract {
         boolean,
         bigint,
         bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
+        bigint,
         bigint
       ] & {
         propertyAddress: string;
@@ -806,6 +783,13 @@ export interface PropertyNFT extends BaseContract {
         estimatedValue: bigint;
         verificationVotes: bigint;
         rejectionVotes: bigint;
+        locationScore: bigint;
+        sizeScore: bigint;
+        conditionScore: bigint;
+        ageScore: bigint;
+        renovationScore: bigint;
+        comparableValue: bigint;
+        lastValuationUpdate: bigint;
       }
     ],
     "view"
@@ -836,6 +820,13 @@ export interface PropertyNFT extends BaseContract {
     nameOrSignature: "setApprovalForAll"
   ): TypedContractMethod<
     [operator: AddressLike, approved: boolean],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "setAuthorizedContract"
+  ): TypedContractMethod<
+    [_contract: AddressLike, _authorized: boolean],
     [void],
     "nonpayable"
   >;
@@ -874,6 +865,22 @@ export interface PropertyNFT extends BaseContract {
     nameOrSignature: "transferOwnership"
   ): TypedContractMethod<[newOwner: AddressLike], [void], "nonpayable">;
   getFunction(
+    nameOrSignature: "updatePropertyValuation"
+  ): TypedContractMethod<
+    [
+      _tokenId: BigNumberish,
+      _estimatedValue: BigNumberish,
+      _comparableValue: BigNumberish,
+      _locationScore: BigNumberish,
+      _sizeScore: BigNumberish,
+      _conditionScore: BigNumberish,
+      _ageScore: BigNumberish,
+      _renovationScore: BigNumberish
+    ],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
     nameOrSignature: "updatePropertyValue"
   ): TypedContractMethod<
     [_tokenId: BigNumberish, _newValue: BigNumberish],
@@ -908,6 +915,13 @@ export interface PropertyNFT extends BaseContract {
     BatchMetadataUpdateEvent.InputTuple,
     BatchMetadataUpdateEvent.OutputTuple,
     BatchMetadataUpdateEvent.OutputObject
+  >;
+  getEvent(
+    key: "ContractAuthorized"
+  ): TypedContractEvent<
+    ContractAuthorizedEvent.InputTuple,
+    ContractAuthorizedEvent.OutputTuple,
+    ContractAuthorizedEvent.OutputObject
   >;
   getEvent(
     key: "MetadataUpdate"
@@ -991,6 +1005,17 @@ export interface PropertyNFT extends BaseContract {
       BatchMetadataUpdateEvent.InputTuple,
       BatchMetadataUpdateEvent.OutputTuple,
       BatchMetadataUpdateEvent.OutputObject
+    >;
+
+    "ContractAuthorized(address,bool)": TypedContractEvent<
+      ContractAuthorizedEvent.InputTuple,
+      ContractAuthorizedEvent.OutputTuple,
+      ContractAuthorizedEvent.OutputObject
+    >;
+    ContractAuthorized: TypedContractEvent<
+      ContractAuthorizedEvent.InputTuple,
+      ContractAuthorizedEvent.OutputTuple,
+      ContractAuthorizedEvent.OutputObject
     >;
 
     "MetadataUpdate(uint256)": TypedContractEvent<

@@ -481,9 +481,9 @@ export default function ValuationPage() {
       const signer = await provider.getSigner()
       const valuationContract = new ethers.Contract(VALUATION_CONTRACT_ADDRESS, valuationContractArtifact.abi, signer)
 
+      // Add detailed logging
       console.log("Confirming valuation for property:", selectedPropertyId)
       console.log("Using contract address:", VALUATION_CONTRACT_ADDRESS)
-      console.log("Contract ABI:", valuationContractArtifact.abi)
       console.log("Current wallet address:", walletAddress)
       console.log("Property owner:", valuationData.owner)
       console.log("Is owner:", walletAddress?.toLowerCase() === valuationData.owner?.toLowerCase())
@@ -508,7 +508,7 @@ export default function ValuationPage() {
         throw new Error("Valuation is no longer verified")
       }
 
-      // Submit confirmation for valuation
+      // Submit confirmation for valuation with explicit gas limit
       const tx = await valuationContract.confirmValuationUpdate(selectedPropertyId, {
         gasLimit: 500000 // Add explicit gas limit
       })

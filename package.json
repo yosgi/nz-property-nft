@@ -2,6 +2,7 @@
   "name": "property-nft",
   "version": "0.1.0",
   "private": true,
+  
   "scripts": {
     "dev": "next dev",
     "dev:sepolia": "cp .env.sepolia .env.local && next dev",
