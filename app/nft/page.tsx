@@ -79,6 +79,7 @@ function PropertyCard({ property }: { property: Property }) {
 
   // Determine property status
   const getPropertyStatus = () => {
+    console.log("property",property)
     if (!property.isVerified) {
       return { 
         label: "Pending Verification", 
@@ -532,14 +533,16 @@ export default function NFTListPage() {
             // No valuation at all (needs initial valuation)
             (!p.hasValuation && !p.hasPendingValuation) ||
             // Has pending valuation (either waiting for votes or waiting for confirmation)
-            (p.hasPendingValuation)
+            (p.hasPendingValuation && !p.pendingValuationVerified)
           )
         )
         break
-      case "verified":
-        // Properties that are verified and have some form of completed valuation process
+      case "need-confirm":
+        // Properties that have pending verified valuations waiting for confirmation
         filtered = allProperties.filter(p => 
-          p.isVerified && p.hasValuation
+          p.isVerified && 
+          p.hasPendingValuation && 
+          p.pendingValuationVerified
         )
         break
       case "valuated":
@@ -561,12 +564,14 @@ export default function NFTListPage() {
   const pendingValuationCount = allProperties.filter(p => 
     p.isVerified && (
       (!p.hasValuation && !p.hasPendingValuation) ||
-      (p.hasPendingValuation)
+      (p.hasPendingValuation && !p.pendingValuationVerified)
     )
   ).length
-  
-  const verifiedCount = allProperties.filter(p => 
-    p.isVerified && p.hasValuation
+
+  const needConfirmCount = allProperties.filter(p => 
+    p.isVerified && 
+    p.hasPendingValuation && 
+    p.pendingValuationVerified
   ).length
   
   const valuatedCount = allProperties.filter(p => 
@@ -612,7 +617,7 @@ export default function NFTListPage() {
       <Tabs defaultValue="pending-verification" className="w-full" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="pending-verification" className="relative">
-            Pending Verification
+            Need Verification
             {pendingVerificationCount > 0 && (
               <Badge variant="secondary" className="ml-2 bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
                 {pendingVerificationCount}
@@ -620,18 +625,18 @@ export default function NFTListPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="pending-valuation" className="relative">
-            Needs Valuation
+            Need Valuation
             {pendingValuationCount > 0 && (
               <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 hover:bg-blue-200">
                 {pendingValuationCount}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="verified" className="relative">
-            Verified
-            {verifiedCount > 0 && (
-              <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800 hover:bg-green-200">
-                {verifiedCount}
+          <TabsTrigger value="need-confirm" className="relative">
+            Need Confirm
+            {needConfirmCount > 0 && (
+              <Badge variant="secondary" className="ml-2 bg-orange-100 text-orange-800 hover:bg-orange-200">
+                {needConfirmCount}
               </Badge>
             )}
           </TabsTrigger>
@@ -659,7 +664,7 @@ export default function NFTListPage() {
           )}
 
           {/* All tab content renders the same grid, just with different filtered data */}
-          {["pending-verification", "pending-valuation", "verified", "valuated"].map((tabValue) => (
+          {["pending-verification", "pending-valuation", "need-confirm", "valuated"].map((tabValue) => (
             <TabsContent key={tabValue} value={tabValue} className="mt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProperties.map((property) => (
@@ -674,7 +679,7 @@ export default function NFTListPage() {
                   <p className="text-gray-500 mt-2">
                     {tabValue === "pending-verification" && "All properties have been verified!"}
                     {tabValue === "pending-valuation" && "No properties need valuation!"}
-                    {tabValue === "verified" && "No verified properties found!"}
+                    {tabValue === "need-confirm" && "No properties need confirmation!"}
                     {tabValue === "valuated" && "No fully valuated properties yet!"}
                   </p>
                   {tabValue === "pending-verification" && (
