@@ -109,6 +109,14 @@ interface Property {
       reject: number
     }
     isVerified: boolean
+    locationScore?: number
+    sizeScore?: number
+    conditionScore?: number
+    ageScore?: number
+    renovationScore?: number
+    updateReason?: string
+    renovationDetails?: string
+    renovationDate?: string
   }
 }
 
@@ -279,7 +287,12 @@ export default function VerifyPage() {
               approve: Number(pendingValuation.verificationVotes) || 0,
               reject: Number(pendingValuation.rejectionVotes) || 0
             },
-            isVerified: pendingValuation.verificationVotes >= 3
+            isVerified: pendingValuation.verificationVotes >= 3,
+            locationScore: Number(pendingValuation.locationScore),
+            sizeScore: Number(pendingValuation.sizeScore),
+            conditionScore: Number(pendingValuation.conditionScore),
+            ageScore: Number(pendingValuation.ageScore),
+            renovationScore: Number(pendingValuation.renovationScore)
           } : undefined
         })
       }
@@ -706,24 +719,48 @@ export default function VerifyPage() {
                         </span>
                       </div>
                       {property.pendingValuation && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">New Value</span>
-                          <span className="text-sm font-semibold">
-                            {formatCurrency(property.pendingValuation.value)}
-                          </span>
-                        </div>
+                        <>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">New Value</span>
+                            <span className="text-sm font-semibold">
+                              {formatCurrency(property.pendingValuation.value)}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium">Location Score</span>
+                              <span className="text-sm">{property.pendingValuation.locationScore}/100</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium">Size Score</span>
+                              <span className="text-sm">{property.pendingValuation.sizeScore}/100</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium">Condition Score</span>
+                              <span className="text-sm">{property.pendingValuation.conditionScore}/100</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium">Age Score</span>
+                              <span className="text-sm">{property.pendingValuation.ageScore}/100</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium">Renovation Score</span>
+                              <span className="text-sm">{property.pendingValuation.renovationScore}/100</span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">Votes</span>
+                            <div className="flex gap-2">
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                Approve: {property.pendingValuation.votes.approve || 0}
+                              </Badge>
+                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                Reject: {property.pendingValuation.votes.reject || 0}
+                              </Badge>
+                            </div>
+                          </div>
+                        </>
                       )}
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Votes</span>
-                        <div className="flex gap-2">
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                            Approve: {property.pendingValuation?.votes.approve || 0}
-                          </Badge>
-                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                            Reject: {property.pendingValuation?.votes.reject || 0}
-                          </Badge>
-                        </div>
-                      </div>
                     </div>
                   </CardContent>
                   <CardFooter className="pt-2">

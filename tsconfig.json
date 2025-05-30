@@ -23,13 +23,15 @@
     }
   },
   "include": [
-  "next-env.d.ts",
-  "pages/**/*.ts",
-  "pages/**/*.tsx",
-  "components/**/*.ts",
-  "components/**/*.tsx",
-  "lib/**/*.ts",
-  ".next/types/**/*.ts"
-],
-"exclude": ["node_modules", "hardhat.config.*", "scripts", "test", "typechain-types"]
+    "next-env.d.ts",
+    "pages/**/*.ts",
+    "pages/**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules", "hardhat.config.*", "scripts", "test", "typechain-types"]
 }
