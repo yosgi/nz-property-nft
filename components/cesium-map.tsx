@@ -1,8 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
-import "cesium/Build/Cesium/Widgets/widgets.css";
-import * as Cesium from "cesium";
 import { LoadScript, GoogleMap, StreetViewPanorama, Libraries } from '@react-google-maps/api';
 import CustomPopup from "./CustomPopup";
 const GOOGLE_MAPS_LIBRARIES: Libraries = ['places'];
@@ -11,8 +9,10 @@ const GOOGLE_MAPS_LIBRARIES: Libraries = ['places'];
 declare global {
   interface Window {
     google: any;
+    CESIUM_BASE_URL: string;
   }
 }
+
 // Add reverse geocoding function
 async function reverseGeocode(latitude: number, longitude: number): Promise<string> {
   try {
@@ -31,8 +31,6 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<stri
   }
 }
 
-
-
 interface Property {
   id?: number;
   address: string;
@@ -46,8 +44,6 @@ interface Property {
   estimatedValue: number;
 }
 
-
-
 export default function CesiumMap({ properties }: { properties: Property[] }) {
   const cesiumContainerRef = useRef<HTMLDivElement>(null)
   const osmBuildingsRef = useRef<any>(null);
@@ -55,12 +51,14 @@ export default function CesiumMap({ properties }: { properties: Property[] }) {
   const [isLoadingAddress, setIsLoadingAddress] = useState(false);
 
   useEffect(() => {
-    let viewer: Cesium.Viewer;
+    let viewer: any;
     const loadCesium = async () => {
       try {
+        // Dynamically import Cesium
+        const Cesium = await import('cesium');
         // Initialize Cesium ion with your access token
-        Cesium.Ion.defaultAccessToken = process.env.NEXT_PUBLIC_CESIUM_TOKEN as string
-        // @ts-ignore
+        Cesium.Ion.defaultAccessToken = process.env.NEXT_PUBLIC_CESIUM_TOKEN as string;
+        // Set CESIUM_BASE_URL
         window.CESIUM_BASE_URL = '/static/cesium/';
         // Create the Cesium viewer
         viewer = new Cesium.Viewer(cesiumContainerRef.current!, {
@@ -72,8 +70,8 @@ export default function CesiumMap({ properties }: { properties: Property[] }) {
           sceneModePicker: true,
           timeline: false,
           animation: false,
-          infoBox: true, // Disable default InfoBox
-        })
+          infoBox: true,
+        });
 
         // Add camera change listener
         viewer.camera.changed.addEventListener(() => {
@@ -89,7 +87,7 @@ export default function CesiumMap({ properties }: { properties: Property[] }) {
 
           // Hide/show property markers based on camera height
           const heightThreshold = 2000; // meters
-          viewer.entities.values.forEach(entity => {
+          viewer.entities.values.forEach((entity: any) => {
             if (entity.name === 'Mount Albert Community' || entity.name === 'Mount Eden Community') {
               // Always show community boundaries
               entity.show = true;
@@ -467,20 +465,26 @@ export default function CesiumMap({ properties }: { properties: Property[] }) {
   useEffect(() => {
     const osmBuildings = osmBuildingsRef.current;
     if (!osmBuildings) return;
-    const nftProperties = properties.filter((p: Property) => p.id !== undefined);
-    const defines: Record<string, string> = {};
-    const colorConditions: [string, string][] = [];
-    nftProperties.forEach((p, i) => {
-      const lng = p.longitude / 1_000_000;
-      const lat = p.latitude / 1_000_000;
-      defines[`dist${i}`] = `distance(vec2(\${feature['cesium#longitude']}, \${feature['cesium#latitude']}), vec2(${lng}, ${lat}))`;
-      colorConditions.push([`\${dist${i}} < 0.0001`, "color('#FFD600', 0.9)"]);
-    });
-    colorConditions.push(["true", "color('#ffffff', 0.8)"]);
-    osmBuildings.style = new Cesium.Cesium3DTileStyle({
-      defines,
-      color: { conditions: colorConditions }
-    });
+
+    const updateStyle = async () => {
+      const Cesium = await import('cesium');
+      const nftProperties = properties.filter((p: Property) => p.id !== undefined);
+      const defines: Record<string, string> = {};
+      const colorConditions: [string, string][] = [];
+      nftProperties.forEach((p, i) => {
+        const lng = p.longitude / 1_000_000;
+        const lat = p.latitude / 1_000_000;
+        defines[`dist${i}`] = `distance(vec2(\${feature['cesium#longitude']}, \${feature['cesium#latitude']}), vec2(${lng}, ${lat}))`;
+        colorConditions.push([`\${dist${i}} < 0.0001`, "color('#FFD600', 0.9)"]);
+      });
+      colorConditions.push(["true", "color('#ffffff', 0.8)"]);
+      osmBuildings.style = new Cesium.Cesium3DTileStyle({
+        defines,
+        color: { conditions: colorConditions }
+      });
+    };
+
+    updateStyle();
   }, [properties]);
 
   return (

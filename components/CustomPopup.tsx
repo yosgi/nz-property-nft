@@ -1,6 +1,6 @@
+"use client"
+
 import { useEffect, useRef, useState, useCallback } from "react"
-import "cesium/Build/Cesium/Widgets/widgets.css";
-import * as Cesium from "cesium";
 import { LoadScript, GoogleMap, StreetViewPanorama, Libraries } from '@react-google-maps/api';
 interface PopupProps {
     position: { x: number; y: number };

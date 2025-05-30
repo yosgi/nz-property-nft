@@ -1,0 +1,9 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+      "module": "CommonJS",
+      "moduleResolution": "node",
+      "types": ["hardhat"]
+    },
+    "include": ["scripts", "test", "typechain-types"]
+  }

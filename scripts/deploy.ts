@@ -1,5 +1,4 @@
-import hardhat from "hardhat";
-const { ethers } = hardhat;
+import { ethers } from "hardhat"; 
 
 async function main() {
   console.log("Starting deployment process...");
@@ -10,7 +9,6 @@ async function main() {
   console.log("\nDeploying PropertyNFT...");
   const PropertyNFT = await ethers.getContractFactory("PropertyNFT");
   const propertyNFT = await PropertyNFT.deploy();
-  console.log("Waiting for PropertyNFT deployment transaction...");
   await propertyNFT.waitForDeployment();
   const propertyNFTAddress = await propertyNFT.getAddress();
   console.log("PropertyNFT deployed to:", propertyNFTAddress);
@@ -18,7 +16,6 @@ async function main() {
   console.log("\nDeploying PropertyValuation...");
   const PropertyValuation = await ethers.getContractFactory("PropertyValuation");
   const propertyValuation = await PropertyValuation.deploy(propertyNFTAddress);
-  console.log("Waiting for PropertyValuation deployment transaction...");
   await propertyValuation.waitForDeployment();
   const propertyValuationAddress = await propertyValuation.getAddress();
   console.log("PropertyValuation deployed to:", propertyValuationAddress);
@@ -29,10 +26,8 @@ async function main() {
   console.log("PropertyValuation:", propertyValuationAddress);
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error("Deployment failed!");
-    console.error(error);
-    process.exit(1);
-  });
+main().catch((error) => {
+  console.error("Deployment failed!");
+  console.error(error);
+  process.exit(1);
+});

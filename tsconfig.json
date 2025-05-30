@@ -22,6 +22,14 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "hardhat.config.*"]
+  "include": [
+  "next-env.d.ts",
+  "pages/**/*.ts",
+  "pages/**/*.tsx",
+  "components/**/*.ts",
+  "components/**/*.tsx",
+  "lib/**/*.ts",
+  ".next/types/**/*.ts"
+],
+"exclude": ["node_modules", "hardhat.config.*", "scripts", "test", "typechain-types"]
 }

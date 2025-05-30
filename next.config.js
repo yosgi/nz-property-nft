@@ -25,21 +25,25 @@ const nextConfig = {
                 from: path.join(__dirname, 'node_modules/cesium/Build/Cesium/Assets'),
                 to: path.join(__dirname, 'public/static/cesium/Assets'),
                 noErrorOnMissing: true,
+                info: { minimized: true }
               },
               {
                 from: path.join(__dirname, 'node_modules/cesium/Build/Cesium/ThirdParty'),
                 to: path.join(__dirname, 'public/static/cesium/ThirdParty'),
                 noErrorOnMissing: true,
+                info: { minimized: true }
               },
               {
                 from: path.join(__dirname, 'node_modules/cesium/Build/Cesium/Workers'),
                 to: path.join(__dirname, 'public/static/cesium/Workers'),
                 noErrorOnMissing: true,
+                info: { minimized: true }
               },
               {
                 from: path.join(__dirname, 'node_modules/cesium/Build/Cesium/Widgets'),
                 to: path.join(__dirname, 'public/static/cesium/Widgets'),
                 noErrorOnMissing: true,
+                info: { minimized: true }
               }
             ]
           })
@@ -58,6 +62,13 @@ const nextConfig = {
         ],
       })
     );
+    config.module.rules.push({
+      test: /\.js$/,
+      include: [
+        path.resolve(__dirname, 'public/static/cesium/')
+      ],
+      type: 'javascript/auto',
+    });
     return config;
   },
 };

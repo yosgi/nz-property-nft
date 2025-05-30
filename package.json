@@ -7,7 +7,7 @@
     "dev": "next dev",
     "dev:sepolia": "cp .env.sepolia .env.local && next dev",
     "dev:hardhat": "cp .env.hardhat .env.local && next dev",
-    "build": "hardhat compile && next build",
+    "build": "next build",
     "build:sepolia": "cp .env.sepolia .env.local && hardhat compile && next build",
     "build:hardhat": "cp .env.sepolia .env.local && hardhat compile && next build",
     "start": "next start",
