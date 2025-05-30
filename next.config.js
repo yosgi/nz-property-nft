@@ -52,6 +52,7 @@ const nextConfig = {
         console.error('Error configuring Cesium webpack plugin:', error);
       }
     }
+    if (process.env.NODE_ENV === 'development') {
     config.plugins.push(
       new CopyPlugin({
         patterns: [
@@ -61,7 +62,8 @@ const nextConfig = {
           },
         ],
       })
-    );
+    )
+    }
     config.module.rules.push({
       test: /\.js$/,
       include: [
