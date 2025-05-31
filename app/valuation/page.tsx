@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ethers } from "ethers"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -9,8 +8,6 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertTriangle, Wallet, CheckCircle, XCircle, Check, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import contractArtifact from "../../public/contracts/PropertyNFT.json"
-import valuationContractArtifact from "../../public/contracts/PropertyValuation.json"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -18,9 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
-
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
-const VALUATION_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_VALUATION_ADDRESS || ""
+import { useContract } from "../contexts/ContractProvider"
+import { PropertyData } from "../types/property"
 
 interface HistoricalValue {
   month: string
@@ -51,6 +47,18 @@ interface ValuationData {
   pendingValuation?: {
     isVerified: boolean
     value: number
+    comparableValue: number
+    votes: number
+    rejections: number
+    canConfirm: boolean
+    lastUpdated: string
+    scores: {
+      location: number
+      size: number
+      condition: number
+      age: number
+      renovation: number
+    }
   }
 }
 
@@ -82,7 +90,7 @@ const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
   return null
 }
 
-// Add LoadingOverlay component
+// Loading overlay component
 const LoadingOverlay = ({ message }: { message: string }) => (
   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
     <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center gap-4">
@@ -92,7 +100,7 @@ const LoadingOverlay = ({ message }: { message: string }) => (
   </div>
 )
 
-// Add ErrorOverlay component
+// Error overlay component
 const ErrorOverlay = ({ message, onClose }: { message: string; onClose: () => void }) => (
   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
     <div className="bg-white p-6 rounded-lg shadow-lg flex flex-col items-center gap-4 max-w-md">
@@ -106,294 +114,258 @@ const ErrorOverlay = ({ message, onClose }: { message: string; onClose: () => vo
 )
 
 export default function ValuationPage() {
-  const [walletConnected, setWalletConnected] = useState(false)
-  const [walletAddress, setWalletAddress] = useState<string>("")
-  const [isConnecting, setIsConnecting] = useState(false)
+  // Use contract context
+  const { 
+    isReady, 
+    address, 
+    connect, 
+    getPropertiesWithPagination, 
+    getProperty, 
+    submitValuation,
+    propertyValuation,
+    transactionPending 
+  } = useContract()
+
+  // Local state
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [valuationData, setValuationData] = useState<ValuationData | null>(null)
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false)
   const [newValuation, setNewValuation] = useState("")
-  const [isUpdating, setIsUpdating] = useState(false)
   const [ownedProperties, setOwnedProperties] = useState<{id: string, address: string}[]>([])
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>("")
-  const [isConfirming, setIsConfirming] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [transactionPending, setTransactionPending] = useState(false)
   const [updateReason, setUpdateReason] = useState("")
   const [renovationDetails, setRenovationDetails] = useState("")
   const [renovationDate, setRenovationDate] = useState("")
-  const [locationScore, setLocationScore] = useState(valuationData?.factors[0].score || 0)
-  const [sizeScore, setSizeScore] = useState(valuationData?.factors[1].score || 0)
-  const [conditionScore, setConditionScore] = useState(valuationData?.factors[2].score || 0)
-  const [ageScore, setAgeScore] = useState(valuationData?.factors[3].score || 0)
-  const [renovationScore, setRenovationScore] = useState(valuationData?.factors[4].score || 0)
+  const [locationScore, setLocationScore] = useState(85)
+  const [sizeScore, setSizeScore] = useState(80)
+  const [conditionScore, setConditionScore] = useState(75)
+  const [ageScore, setAgeScore] = useState(70)
+  const [renovationScore, setRenovationScore] = useState(65)
 
-  // Check wallet connection on mount
-  useEffect(() => {
-    const checkWalletConnection = async () => {
-      if (window.ethereum) {
-        try {
-          const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
-          const signer = await provider.getSigner()
-          const address = await signer.getAddress()
-          setWalletConnected(true)
-          setWalletAddress(address)
-          await fetchValuationData()
-        } catch (err) {
-          console.error("Error checking wallet connection:", err)
-          setWalletConnected(false)
-          setWalletAddress("")
-        }
-      }
+  // Generate historical values with realistic fluctuations
+  const generateHistoricalValues = (baseValue: number) => {
+    const months = 12
+    const values = []
+    let currentValue = baseValue
+    
+    // Seasonal factors (higher in spring/summer, lower in fall/winter)
+    const seasonalFactors = {
+      'Jan': 0.98, 'Feb': 0.99, 'Mar': 1.01, 'Apr': 1.02,
+      'May': 1.03, 'Jun': 1.02, 'Jul': 1.01, 'Aug': 1.00,
+      'Sep': 0.99, 'Oct': 0.98, 'Nov': 0.97, 'Dec': 0.98
     }
-
-    checkWalletConnection()
-  }, [])
-
-  // Listen for account changes
-  useEffect(() => {
-    if (window.ethereum) {
-      const handleAccountsChanged = (accounts: string[]) => {
-        if (accounts.length === 0) {
-          setWalletConnected(false)
-          setWalletAddress("")
-          setValuationData(null)
-        } else {
-          setWalletConnected(true)
-          setWalletAddress(accounts[0])
-          fetchValuationData()
-        }
-      }
-
-      window.ethereum.on('accountsChanged', handleAccountsChanged)
-
-      return () => {
-        if (window.ethereum) {
-          window.ethereum.removeListener('accountsChanged', handleAccountsChanged)
-        }
-      }
+    
+    // Generate values for the last 12 months
+    for (let i = 0; i < months; i++) {
+      const date = new Date()
+      date.setMonth(date.getMonth() - (months - 1 - i))
+      const month = date.toLocaleString('default', { month: 'short' })
+      
+      // Add random fluctuation (-2% to +2%)
+      const randomFactor = 0.98 + Math.random() * 0.04
+      
+      // Apply seasonal factor
+      const seasonalFactor = seasonalFactors[month as keyof typeof seasonalFactors]
+      
+      // Calculate new value with both random and seasonal factors
+      currentValue = currentValue * randomFactor * seasonalFactor
+      
+      // Add small trend factor (slight upward trend)
+      const trendFactor = 1 + (i * 0.001) // 0.1% increase per month
+      
+      values.push({
+        month,
+        value: currentValue * trendFactor
+      })
     }
-  }, [])
+    
+    return values
+  }
 
-  const connectWallet = async () => {
-    setIsConnecting(true)
-    setErrorMessage(null)
+  // Fetch owned properties using contract provider
+  const fetchOwnedProperties = async () => {
+    if (!isReady || !address) return
+
     try {
-      if (!window.ethereum) {
-        throw new Error("Please install MetaMask to view valuations")
-      }
+      setLoading(true)
+      
+      // Get properties owned by current user
+      const result = await getPropertiesWithPagination({
+        page: 1,
+        limit: 100, // Get all properties for the user
+        owner: address
+      })
 
-      const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
-      const signer = await provider.getSigner()
-      const address = await signer.getAddress()
-      setWalletConnected(true)
-      setWalletAddress(address)
-      await fetchValuationData()
+      const properties = result.properties.map(prop => ({
+        id: prop.tokenId.toString(),
+        address: prop.propertyAddress
+      }))
+
+      setOwnedProperties(properties)
+      
+      // Auto-select first property if none selected
+      if (properties.length > 0 && !selectedPropertyId) {
+        setSelectedPropertyId(properties[0].id)
+      }
     } catch (err) {
-      console.error("Error connecting wallet:", err)
-      const errorMsg = err instanceof Error ? err.message : "Failed to connect wallet"
-      setErrorMessage(errorMsg)
-      toast.error(errorMsg)
+      console.error("Error fetching owned properties:", err)
+      setError(err instanceof Error ? err.message : "Failed to fetch owned properties")
     } finally {
-      setIsConnecting(false)
+      setLoading(false)
     }
   }
 
+  // Fetch valuation data for selected property
   const fetchValuationData = async () => {
-    setLoading(true)
-    setErrorMessage(null)
+    if (!isReady || !selectedPropertyId || !propertyValuation) return
+
     try {
-      if (!window.ethereum) {
-        throw new Error("Please install MetaMask to view valuations")
-      }
+      setLoading(true)
+      setError(null)
 
-      const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, contractArtifact.abi, provider)
-      const valuationContract = new ethers.Contract(VALUATION_CONTRACT_ADDRESS, valuationContractArtifact.abi, provider)
+      // Get the selected property's data
+      const property = await getProperty(selectedPropertyId)
+      
+      // Get all verified properties for comparable value calculation
+      const allPropertiesResult = await getPropertiesWithPagination({
+        page: 1,
+        limit: 100,
+        verifiedOnly: true
+      })
 
-      if (!selectedPropertyId) {
-        setValuationData(null)
-        return
-      }
-
-      // Fetch the selected property's data
-      const propertyData = await contract.getProperty(selectedPropertyId)
-      console.log("Selected property data:", propertyData)
-
-      // Get the owner of the property
-      const owner = await contract.ownerOf(selectedPropertyId)
-      console.log("Property owner:", owner)
-
-      // Get pending valuation data
-      const pendingValuation = await valuationContract.pendingValuations(selectedPropertyId)
-      console.log("Pending valuation:", pendingValuation)
-
-      // Get total number of properties for comparable value calculation
-      const totalProperties = await contract.getTotalProperties()
-      const properties = []
-
-      // Fetch all verified properties for comparable value
-      for (let i = 0; i < totalProperties; i++) {
-        try {
-          const propData = await contract.getProperty(i)
-          // Only include verified properties with valid values
-          if (propData.isVerified && propData.estimatedValue) {
-            const value = Number(ethers.formatEther(propData.estimatedValue)) * 5000 // Convert to NZD
-            // Only include values within reasonable range (e.g., 500 NZD to 5,000,000 NZD)
-            if (value > 500 && value < 5000000) {
-              properties.push({
-                address: propData.propertyAddress,
-                estimatedValue: value
-              })
-            }
-          }
-        } catch (err) {
-          console.log(`Property ${i} not found`)
-        }
-      }
+      const verifiedProperties = allPropertiesResult.properties
+        .filter(p => p.estimatedValue > 0)
+        .map(p => ({
+          address: p.propertyAddress,
+          estimatedValue: Number(p.estimatedValue) / 1e18 * 500000 // Convert from Wei to NZD
+        }))
+        .filter(p => p.estimatedValue > 50000 && p.estimatedValue < 5000000) // Reasonable range
 
       // Calculate comparable value (average of verified properties)
-      const comparableValue = properties.length >= 2
-        ? properties.reduce((acc, p) => acc + p.estimatedValue, 0) / properties.length
+      const comparableValue = verifiedProperties.length >= 2
+        ? verifiedProperties.reduce((acc, p) => acc + p.estimatedValue, 0) / verifiedProperties.length
         : 0
 
-      // Generate historical values with realistic fluctuations
-      const generateHistoricalValues = (baseValue: number) => {
-        const months = 12
-        const values = []
-        let currentValue = baseValue
-        
-        // Seasonal factors (higher in spring/summer, lower in fall/winter)
-        const seasonalFactors = {
-          'Jan': 0.98, 'Feb': 0.99, 'Mar': 1.01, 'Apr': 1.02,
-          'May': 1.03, 'Jun': 1.02, 'Jul': 1.01, 'Aug': 1.00,
-          'Sep': 0.99, 'Oct': 0.98, 'Nov': 0.97, 'Dec': 0.98
-        }
-        
-        // Generate values for the last 12 months
-        for (let i = 0; i < months; i++) {
-          const date = new Date()
-          date.setMonth(date.getMonth() - (months - 1 - i))
-          const month = date.toLocaleString('default', { month: 'short' })
-          
-          // Add random fluctuation (-2% to +2%)
-          const randomFactor = 0.98 + Math.random() * 0.04
-          
-          // Apply seasonal factor
-          const seasonalFactor = seasonalFactors[month as keyof typeof seasonalFactors]
-          
-          // Calculate new value with both random and seasonal factors
-          currentValue = currentValue * randomFactor * seasonalFactor
-          
-          // Add small trend factor (slight upward trend)
-          const trendFactor = 1 + (i * 0.001) // 0.1% increase per month
-          
-          values.push({
-            month,
-            value: currentValue * trendFactor
-          })
-        }
-        
-        return values
-      }
+      // Convert property estimated value from Wei to NZD
+      const propertyValueNZD = Number(property.estimatedValue) / 1e18 * 500000
 
-      // Generate historical values using the new function
-      const historicalValues = generateHistoricalValues(Number(ethers.formatEther(propertyData.estimatedValue)) * 5000)
+      // Generate historical values
+      const historicalValues = generateHistoricalValues(propertyValueNZD)
 
-      // Generate comparable properties
-      const comparableProperties = properties.slice(0, 3).map((p, i) => ({
+      // Generate comparable properties (first 3)
+      const comparableProperties = verifiedProperties.slice(0, 3).map((p, i) => ({
         address: p.address,
         value: p.estimatedValue,
-        distance: `${(i + 1) * 0.1} miles`,
+        distance: `${(i + 1) * 0.1} km`,
       }))
 
-      // Default scores if not available
-      const defaultScores = {
-        locationScore: 85,    // Location is typically the most important factor, given higher score
-        sizeScore: 80,        // Property size is also a significant factor
-        conditionScore: 75,   // Overall property condition
-        ageScore: 70,         // Base age score
-        renovationScore: 65   // Base renovation score
+      // Use property scores if available, otherwise use defaults
+      const factors = [
+        { name: "Location", score: property.locationScore || locationScore },
+        { name: "Property Size", score: property.sizeScore || sizeScore },
+        { name: "Condition", score: property.conditionScore || conditionScore },
+        { name: "Age", score: property.ageScore || ageScore },
+        { name: "Renovations", score: property.renovationScore || renovationScore },
+      ]
+
+      // Check for pending valuation
+      let pendingValuation = undefined
+      try {
+        const pendingVal = await propertyValuation.getPendingValuation(Number(selectedPropertyId))
+        console.log("Pending valuation data:", pendingVal)
+        
+        if (pendingVal && Number(pendingVal.estimatedValue) > 0) {
+          // Check if user can confirm (owner + verified)
+          const isOwner = address?.toLowerCase() === property.currentOwner.toLowerCase()
+          const canConfirm = isOwner && pendingVal.isVerified
+          
+          pendingValuation = {
+            isVerified: pendingVal.isVerified,
+            value: Number(pendingVal.estimatedValue) / 1e18 * 500000, // Convert to NZD
+            comparableValue: Number(pendingVal.comparableValue) / 1e18 * 500000,
+            votes: Number(pendingVal.verificationVotes),
+            rejections: Number(pendingVal.rejectionVotes),
+            canConfirm: canConfirm,
+            lastUpdated: new Date(Number(pendingVal.lastUpdated) * 1000).toLocaleDateString(),
+            scores: {
+              location: Number(pendingVal.locationScore),
+              size: Number(pendingVal.sizeScore),
+              condition: Number(pendingVal.conditionScore),
+              age: Number(pendingVal.ageScore),
+              renovation: Number(pendingVal.renovationScore)
+            }
+          }
+        }
+      } catch (error) {
+        console.log("No pending valuation found")
       }
-
-      // Adjust score based on property age
-      const age = Number(propertyData.ageScore) || defaultScores.ageScore
-      const adjustedAgeScore = age > 20 ? 60 : age > 10 ? 70 : 80
-
-      // Adjust score based on renovation age
-      const renovation = Number(propertyData.renovationScore) || defaultScores.renovationScore
-      const adjustedRenovationScore = renovation > 5 ? 75 : renovation > 2 ? 65 : 55
 
       setValuationData({
         id: selectedPropertyId,
-        address: propertyData.propertyAddress,
-        estimatedValue: Number(ethers.formatEther(propertyData.estimatedValue)) * 5000,
+        address: property.propertyAddress,
+        estimatedValue: propertyValueNZD,
         comparableValue: comparableValue,
         lastUpdated: new Date().toLocaleDateString(),
-        factors: [
-          { name: "Location", score: Number(propertyData.locationScore) || defaultScores.locationScore },
-          { name: "Property Size", score: Number(propertyData.sizeScore) || defaultScores.sizeScore },
-          { name: "Condition", score: Number(propertyData.conditionScore) || defaultScores.conditionScore },
-          { name: "Age", score: adjustedAgeScore },
-          { name: "Renovations", score: adjustedRenovationScore },
-        ],
-        historicalValues: historicalValues.map(value => ({
-          month: value.month,
-          value: value.value
-        })),
-        comparableProperties: comparableProperties.map(prop => ({
-          address: prop.address,
-          value: prop.value,
-          distance: prop.distance,
-        })),
-        owner,
-        pendingValuation: pendingValuation && pendingValuation[0] > 0 ? {
-          isVerified: pendingValuation[8],
-          value: Number(ethers.formatEther(pendingValuation[0])) * 5000
-        } : undefined
+        factors,
+        historicalValues,
+        comparableProperties,
+        owner: property.currentOwner,
+        pendingValuation
       })
+
     } catch (err) {
       console.error("Error fetching valuation data:", err)
       const errorMsg = err instanceof Error ? err.message : "Failed to fetch valuation data"
-      setErrorMessage(errorMsg)
+      setError(errorMsg)
       toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleUpdateValuation = async () => {
-    if (!newValuation || !walletConnected || !valuationData) return
-
-    setTransactionPending(true)
-    setErrorMessage(null)
+  // Handle valuation confirmation
+  const handleConfirmValuation = async () => {
+    if (!isReady || !valuationData?.pendingValuation || !propertyValuation) return
 
     try {
-      if (!window.ethereum) {
-        throw new Error("Please install MetaMask to update valuation")
-      }
-
-      const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
-      const signer = await provider.getSigner()
-      const valuationContract = new ethers.Contract(VALUATION_CONTRACT_ADDRESS, valuationContractArtifact.abi, signer)
-
-      // Convert NZD to Wei (divide by 5000 to get ETH equivalent, then convert to Wei)
-      const ethValue = Number(newValuation) / 5000
-      const valuationInWei = ethers.parseEther(ethValue.toString())
+      setLoading(true)
       
-      // Submit valuation for verification
-      const tx = await valuationContract.submitValuation(
-        selectedPropertyId,
-        valuationInWei,
-        valuationInWei,
+      // Call confirmValuationUpdate on the valuation contract
+      const tx = await propertyValuation.confirmValuationUpdate(Number(selectedPropertyId))
+      await tx.wait()
+      
+      toast.success("Valuation confirmed and updated successfully!")
+      
+      // Refresh data to show updated values
+      await fetchValuationData()
+    } catch (err) {
+      console.error("Error confirming valuation:", err)
+      const errorMsg = err instanceof Error ? err.message : "Failed to confirm valuation"
+      setError(errorMsg)
+      toast.error(errorMsg)
+    } finally {
+      setLoading(false)
+    }
+  }
+  const handleUpdateValuation = async () => {
+    if (!newValuation || !isReady || !valuationData) return
+
+    try {
+      // Convert NZD to Wei (divide by 500000 to get ETH equivalent, then convert to Wei)
+      const ethValue = Number(newValuation) / 500000
+      const valuationInWei = Math.floor(ethValue * 1e18)
+      
+      await submitValuation({
+        tokenId: Number(selectedPropertyId),
+        estimatedValue: valuationInWei,
+        comparableValue: valuationInWei,
         locationScore,
         sizeScore,
         conditionScore,
         ageScore,
         renovationScore
-      )
-      await tx.wait()
+      })
 
       toast.success("Property valuation submitted for verification")
       setIsUpdateDialogOpen(false)
@@ -401,170 +373,59 @@ export default function ValuationPage() {
       setUpdateReason("")
       setRenovationDetails("")
       setRenovationDate("")
+      
+      // Refresh data
       await fetchValuationData()
     } catch (err) {
-      console.error("Error updating valuation:", err)
       const errorMsg = err instanceof Error ? err.message : "Failed to update valuation"
-      setErrorMessage(errorMsg)
+      setError(errorMsg)
       toast.error(errorMsg)
-    } finally {
-      setTransactionPending(false)
     }
   }
 
-  const fetchOwnedProperties = async () => {
-    try {
-      if (!window.ethereum) {
-        throw new Error("Please install MetaMask to view valuations")
-      }
-
-      const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
-      const signer = await provider.getSigner()
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, contractArtifact.abi, signer)
-
-      // Get total number of properties
-      const totalProperties = await contract.getTotalProperties()
-      const properties = []
-
-      // Fetch each property and check ownership
-      for (let i = 0; i < totalProperties; i++) {
-        try {
-          const owner = await contract.ownerOf(i)
-          if (owner.toLowerCase() === walletAddress.toLowerCase()) {
-            const propertyData = await contract.getProperty(i)
-            properties.push({
-              id: i.toString(),
-              address: propertyData.propertyAddress
-            })
-          }
-        } catch (err) {
-          console.log(`Property ${i} not found or not owned`)
-        }
-      }
-
-      setOwnedProperties(properties)
-      if (properties.length > 0 && !selectedPropertyId) {
-        setSelectedPropertyId(properties[0].id)
-      }
-    } catch (err) {
-      console.error("Error fetching owned properties:", err)
-      setError(err instanceof Error ? err.message : "Failed to fetch owned properties")
-    }
-  }
-
-  // Update useEffect to fetch owned properties when wallet connects
+  // Effect to fetch owned properties when wallet connects
   useEffect(() => {
-    if (walletConnected && walletAddress) {
+    if (isReady && address) {
       fetchOwnedProperties()
     }
-  }, [walletConnected, walletAddress])
+  }, [isReady, address])
 
-  // Add useEffect to fetch valuation data when selected property changes
+  // Effect to fetch valuation data when selected property changes
   useEffect(() => {
-    if (selectedPropertyId) {
+    if (selectedPropertyId && isReady && propertyValuation) {
       fetchValuationData()
     }
-  }, [selectedPropertyId])
+  }, [selectedPropertyId, isReady, propertyValuation])
 
-  const handleConfirmValuation = async () => {
-    if (!walletConnected || !valuationData) return
-
-    setTransactionPending(true)
-    setErrorMessage(null)
-
-    try {
-      if (!window.ethereum) {
-        throw new Error("Please install MetaMask to confirm valuation")
-      }
-
-      const provider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider)
-      const signer = await provider.getSigner()
-      const valuationContract = new ethers.Contract(VALUATION_CONTRACT_ADDRESS, valuationContractArtifact.abi, signer)
-
-      console.log("Confirming valuation for property:", selectedPropertyId)
-      console.log("Using contract address:", VALUATION_CONTRACT_ADDRESS)
-      console.log("Contract ABI:", valuationContractArtifact.abi)
-      console.log("Current wallet address:", walletAddress)
-      console.log("Property owner:", valuationData.owner)
-      console.log("Is owner:", walletAddress?.toLowerCase() === valuationData.owner?.toLowerCase())
-      console.log("Pending valuation:", valuationData.pendingValuation)
-
-      // Check if the valuation is verified
-      if (!valuationData.pendingValuation?.isVerified) {
-        throw new Error("Valuation must be verified before confirmation")
-      }
-
-      // Check if the user is the owner
-      if (walletAddress?.toLowerCase() !== valuationData.owner?.toLowerCase()) {
-        throw new Error("Only the property owner can confirm valuation updates")
-      }
-
-      // Get the current pending valuation
-      const pendingValuation = await valuationContract.pendingValuations(selectedPropertyId)
-      console.log("Current pending valuation:", pendingValuation)
-
-      // Check if the valuation is still pending and verified
-      if (!pendingValuation[8]) { // isVerified is at index 8
-        throw new Error("Valuation is no longer verified")
-      }
-
-      // Submit confirmation for valuation
-      const tx = await valuationContract.confirmValuationUpdate(selectedPropertyId, {
-        gasLimit: 500000 // Add explicit gas limit
-      })
-      console.log("Transaction sent:", tx.hash)
-      
-      const receipt = await tx.wait()
-      console.log("Transaction confirmed:", receipt)
-
-      toast.success("Property valuation confirmed")
-      setIsUpdateDialogOpen(false)
-      await fetchValuationData() // Refresh the valuation data
-    } catch (err) {
-      console.error("Error confirming valuation:", err)
-      const errorMsg = err instanceof Error ? err.message : "Failed to confirm valuation"
-      setErrorMessage(errorMsg)
-      toast.error(errorMsg)
-    } finally {
-      setTransactionPending(false)
-    }
-  }
-
+  // Show loading overlay during transactions
   if (transactionPending) {
-    return (
-      <LoadingOverlay message="Processing blockchain transaction..." />
-    )
+    return <LoadingOverlay message="Processing blockchain transaction..." />
   }
 
+  // Show loading overlay while fetching data
   if (loading) {
-    return (
-      <LoadingOverlay message="Loading valuation data..." />
-    )
+    return <LoadingOverlay message="Loading valuation data..." />
   }
 
-  if (errorMessage) {
+  // Show error overlay
+  if (error) {
     return (
       <ErrorOverlay 
-        message={errorMessage} 
-        onClose={() => setErrorMessage(null)} 
+        message={error} 
+        onClose={() => setError(null)} 
       />
     )
   }
 
-  if (!walletConnected) {
+  // Show connect wallet prompt
+  if (!isReady) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">Property Valuation</h1>
-          <Button onClick={connectWallet} disabled={isConnecting}>
-            {isConnecting ? (
-              <>Connecting Wallet...</>
-            ) : (
-              <>
-                <Wallet className="mr-2 h-4 w-4" />
-                Connect MetaMask
-              </>
-            )}
+          <Button onClick={connect}>
+            <Wallet className="mr-2 h-4 w-4" />
+            Connect MetaMask
           </Button>
         </div>
         <Alert>
@@ -577,8 +438,29 @@ export default function ValuationPage() {
       </div>
     )
   }
-  console.log(valuationData)
 
+  // Show no properties message
+  if (ownedProperties.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Property Valuation</h1>
+          <Badge variant="outline">
+            Connected: {address ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}` : 'No Address'}
+          </Badge>
+        </div>
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>No Properties Found</AlertTitle>
+          <AlertDescription>
+            You don't own any properties yet. Submit a property to get started.
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
+  // Show no data message if no valuation data
   if (!valuationData) {
     return (
       <div className="max-w-7xl mx-auto p-4">
@@ -599,59 +481,36 @@ export default function ValuationPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Property Valuation</h1>
-        {!walletConnected ? (
-          <Button onClick={connectWallet} disabled={isConnecting}>
-            {isConnecting ? (
-              <>Connecting Wallet...</>
-            ) : (
-              <>
-                <Wallet className="mr-2 h-4 w-4" />
-                Connect MetaMask
-              </>
-            )}
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="mr-2">
-              Connected: {walletAddress ? `${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}` : 'No Address'}
-            </Badge>
-            {valuationData && walletAddress?.toLowerCase() === valuationData.owner?.toLowerCase() && (
-              <Button variant="outline" onClick={() => setIsUpdateDialogOpen(true)}>
-                Update Valuation
-              </Button>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="mr-2">
+            Connected: {address ? `${address.substring(0, 6)}...${address.substring(address.length - 4)}` : 'No Address'}
+          </Badge>
+          {valuationData && address?.toLowerCase() === valuationData.owner?.toLowerCase() && (
+            <Button variant="outline" onClick={() => setIsUpdateDialogOpen(true)}>
+              Update Valuation
+            </Button>
+          )}
+        </div>
       </div>
 
-      {walletConnected && ownedProperties.length > 0 && (
-        <div className="flex items-center gap-4">
-          <Label>Select Property:</Label>
-          <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
-            <SelectTrigger className="w-[300px]">
-              <SelectValue placeholder="Select a property" />
-            </SelectTrigger>
-            <SelectContent>
-              {ownedProperties.map((property) => (
-                <SelectItem key={property.id} value={property.id}>
-                  {property.address}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      {/* Property selector */}
+      <div className="flex items-center gap-4">
+        <Label>Select Property:</Label>
+        <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+          <SelectTrigger className="w-[300px]">
+            <SelectValue placeholder="Select a property" />
+          </SelectTrigger>
+          <SelectContent>
+            {ownedProperties.map((property) => (
+              <SelectItem key={property.id} value={property.id}>
+                {property.address}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-      {walletConnected && ownedProperties.length === 0 && (
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>No Properties Found</AlertTitle>
-          <AlertDescription>
-            You don't own any properties yet. Submit a property to get started.
-          </AlertDescription>
-        </Alert>
-      )}
-
+      {/* Update valuation dialog */}
       <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -770,14 +629,15 @@ export default function ValuationPage() {
             </Button>
             <Button
               onClick={handleUpdateValuation}
-              disabled={!newValuation || isUpdating}
+              disabled={!newValuation}
             >
-              {isUpdating ? "Updating..." : "Update Valuation"}
+              Update Valuation
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Main content */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="md:col-span-2">
           <CardHeader>
@@ -800,27 +660,71 @@ export default function ValuationPage() {
                     <span className="text-sm text-muted-foreground ml-2">vs. Comparable Value</span>
                   </div>
                   {valuationData.pendingValuation && (
-                    <div className="mt-4 p-3 bg-muted rounded-lg">
-                      <div className="text-sm font-medium mb-1">Pending Update</div>
-                      <div className="text-lg font-bold text-blue-600">
-                        {formatCurrency(valuationData.pendingValuation.value)}
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm font-medium text-blue-800">Pending Valuation Update</div>
+                        <div className="flex items-center gap-2">
+                          {valuationData.pendingValuation.isVerified && (
+                            <Badge className="bg-green-100 text-green-800">✓ Verified</Badge>
+                          )}
+                          {!valuationData.pendingValuation.isVerified && (
+                            <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                              Awaiting Verification
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {valuationData.pendingValuation.isVerified 
-                          ? "Verified by 3 or more validators"
-                          : "Awaiting verification"}
+                      
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-blue-700 font-medium">New Value:</span>
+                          <div className="text-lg font-bold text-blue-800">
+                            {formatCurrency(valuationData.pendingValuation.value)}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-blue-700 font-medium">Comparable:</span>
+                          <div className="text-lg font-bold text-blue-800">
+                            {formatCurrency(valuationData.pendingValuation.comparableValue)}
+                          </div>
+                        </div>
                       </div>
+
+                      <div className="grid grid-cols-5 gap-2 text-xs text-blue-600">
+                        <div>Location: {valuationData.pendingValuation.scores.location}/100</div>
+                        <div>Size: {valuationData.pendingValuation.scores.size}/100</div>
+                        <div>Condition: {valuationData.pendingValuation.scores.condition}/100</div>
+                        <div>Age: {valuationData.pendingValuation.scores.age}/100</div>
+                        <div>Renovation: {valuationData.pendingValuation.scores.renovation}/100</div>
+                      </div>
+
+                      <div className="flex justify-between items-center text-xs text-blue-600">
+                        <span>Votes: {valuationData.pendingValuation.votes} | Rejections: {valuationData.pendingValuation.rejections}</span>
+                        <span>Updated: {valuationData.pendingValuation.lastUpdated}</span>
+                      </div>
+
+                      {valuationData.pendingValuation.isVerified && 
+                       address?.toLowerCase() === valuationData.owner?.toLowerCase() && (
+                        <div className="pt-2 border-t border-blue-200">
+                          <Button 
+                            onClick={handleConfirmValuation}
+                            className="w-full bg-green-600 hover:bg-green-700"
+                            disabled={loading}
+                          >
+                            {loading ? "Confirming..." : "Confirm Valuation Update"}
+                          </Button>
+                          <p className="text-xs text-blue-600 mt-1 text-center">
+                            This will update your property's official valuation
+                          </p>
+                        </div>
+                      )}
+
+                      {!valuationData.pendingValuation.isVerified && (
+                        <div className="text-xs text-blue-600 text-center">
+                          Waiting for {3 - valuationData.pendingValuation.votes} more votes to verify
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {valuationData.pendingValuation?.isVerified && 
-                   walletAddress?.toLowerCase() === valuationData.owner?.toLowerCase() && (
-                    <Button 
-                      className="mt-4 w-full"
-                      onClick={handleConfirmValuation}
-                      disabled={isConfirming}
-                    >
-                      {isConfirming ? "Confirming..." : "Confirm Valuation Update"}
-                    </Button>
                   )}
                 </CardContent>
               </Card>

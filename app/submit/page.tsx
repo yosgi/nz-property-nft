@@ -1,9 +1,7 @@
 "use client"
 
-import type React from "react"
-import type { EthereumProvider } from "../types/ethereum"
 import { useState, useEffect } from "react"
-import { ethers } from "ethers"
+import { useContract } from "../contexts/ContractProvider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,33 +13,26 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Loader } from "@googlemaps/js-api-loader"
-
-// Import the contract ABI
-import contractArtifact from "../../public/contracts/PropertyNFT.json"
-
-// Add contract ABI and address
-const contractABI = contractArtifact.abi
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_PROPERTY_NFT_ADDRESS || ""
+import { toast } from "sonner"
 
 // Add Google Maps API key
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""
 
-const NZ_PROPERTY_TYPES = {
-  "HOUSE": "House",
-  "APARTMENT": "Apartment",
-  "TOWNHOUSE": "Townhouse",
-  "UNIT": "Unit",
-  "VILLA": "Villa",
-  "BUNGALOW": "Bungalow",
-  "TERRACE": "Terrace House",
-  "SECTION": "Section/Land",
-  "COMMERCIAL": "Commercial",
-  "RURAL": "Rural Property",
-  "LIFESTYLE": "Lifestyle Block",
-  "BACH": "Bach/Holiday Home"
-} as const
+const NZ_PROPERTY_TYPES: Record<string, string> = {
+  "house": "House",
+  "apartment": "Apartment",
+  "townhouse": "Townhouse",
+  "unit": "Unit",
+  "villa": "Villa",
+  "studio": "Studio",
+  "penthouse": "Penthouse",
+  "duplex": "Duplex",
+  "terrace": "Terrace",
+  "other": "Other"
+}
 
 export default function SubmitPage() {
+  const { submitProperty, connect } = useContract()
   const [formData, setFormData] = useState({
     address: "",
     ownerName: "",
@@ -53,16 +44,15 @@ export default function SubmitPage() {
   })
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<{
-    address?: string;
-    ownerName?: string;
-    renovationDate?: string;
-    propertyType?: string;
-    image?: string;
-    latitude?: string;
-    longitude?: string;
+    address?: string
+    ownerName?: string
+    renovationDate?: string
+    propertyType?: string
+    image?: string
+    latitude?: string
+    longitude?: string
   }>({})
 
   useEffect(() => {
@@ -106,13 +96,13 @@ export default function SubmitPage() {
 
   const validateForm = () => {
     const errors: {
-      address?: string;
-      ownerName?: string;
-      renovationDate?: string;
-      propertyType?: string;
-      image?: string;
-      latitude?: string;
-      longitude?: string;
+      address?: string
+      ownerName?: string
+      renovationDate?: string
+      propertyType?: string
+      image?: string
+      latitude?: string
+      longitude?: string
     } = {}
 
     if (!formData.address.trim()) {
@@ -208,29 +198,14 @@ export default function SubmitPage() {
     }
 
     setIsLoading(true)
-    setError(null)
 
     try {
       if (!formData.image) {
         throw new Error("Please upload a property image")
       }
 
-      // Check if MetaMask is installed
-      if (!window.ethereum) {
-        throw new Error("Please install MetaMask to use this feature")
-      }
-
       // Upload image to IPFS
       const imageURI = await uploadToIPFS(formData.image)
-
-      // Request account access
-      await (window.ethereum as EthereumProvider).request({ method: "eth_requestAccounts" })
-      const provider = new ethers.BrowserProvider(window.ethereum as EthereumProvider)
-      const signer = await provider.getSigner()
-      const ownerAddress = await signer.getAddress()
-
-      // Create contract instance
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI, signer)
 
       // Convert renovation date to Unix timestamp
       const renovationTimestamp = formData.renovationDate 
@@ -242,36 +217,24 @@ export default function SubmitPage() {
       const longitude = Math.floor(parseFloat(formData.longitude) * 1000000)
 
       // Submit the property
-      const tx = await contract.submitProperty(
-        formData.address,
-        formData.ownerName,
-        formData.propertyType,
-        renovationTimestamp,
+      const tx = await submitProperty({
+        propertyAddress: formData.address,
+        ownerName: formData.ownerName,
+        propertyType: formData.propertyType,
+        renovationDate: renovationTimestamp,
         imageURI,
         latitude,
         longitude
-      )
+      })
 
       // Wait for transaction to be mined
-      const receipt = await tx.wait()
-      
-      // Get the PropertySubmitted event
-      const event = receipt.logs.find(
-        (log: any) => log.fragment && log.fragment.name === "PropertySubmitted"
-      )
-      
-      if (event) {
-        console.log("Property submitted successfully!", {
-          tokenId: event.args.tokenId.toString(),
-          owner: ownerAddress,
-          address: formData.address
-        })
-      }
+      await tx.wait()
       
       setIsSubmitted(true)
-    } catch (err) {
-      console.error("Error submitting property:", err)
-      setError(err instanceof Error ? err.message : "Failed to submit property")
+      toast.success("Property submitted successfully!")
+    } catch (error) {
+      console.error("Error submitting property:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to submit property")
     } finally {
       setIsLoading(false)
     }
@@ -281,13 +244,19 @@ export default function SubmitPage() {
     <div className="max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">Submit Property</h1>
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
+      <Card className="relative">
+        {/* Loading Overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+              <p className="text-sm text-gray-600">
+                Submitting property...
+              </p>
+            </div>
+          </div>
+        )}
 
-      <Card>
         <CardHeader>
           <CardTitle>Property Information</CardTitle>
           <CardDescription>Enter the details of your property to create an NFT representation.</CardDescription>

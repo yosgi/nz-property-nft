@@ -13,7 +13,8 @@ const config: HardhatUserConfig = {
       optimizer: {
         enabled: true,
         runs: 200
-      }
+      },
+      viaIR: true,
     }
   },
   networks: {
@@ -22,7 +23,7 @@ const config: HardhatUserConfig = {
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : []
     },
     hardhat: {
-      chainId: 1337
+      chainId: 31337
     }
   },
   paths: {

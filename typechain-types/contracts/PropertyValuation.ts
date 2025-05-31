@@ -70,17 +70,23 @@ export interface PropertyValuationInterface extends Interface {
     nameOrSignature:
       | "REJECTION_THRESHOLD"
       | "VERIFICATION_THRESHOLD"
+      | "checkAuthorizationStatus"
       | "confirmValuationUpdate"
+      | "debugConfirmValuation"
       | "getHistoricalValues"
       | "getPendingValuation"
       | "getValuation"
+      | "getValuationStatus"
       | "hasUserVoted"
+      | "hasUserVotedOnPending"
       | "historicalValues"
+      | "isAuthorizedToUpdate"
       | "owner"
       | "pendingValuationVotes"
       | "pendingValuations"
       | "propertyNFT"
       | "renounceOwnership"
+      | "requestAuthorization"
       | "submitValuation"
       | "transferOwnership"
       | "valuations"
@@ -89,6 +95,7 @@ export interface PropertyValuationInterface extends Interface {
 
   getEvent(
     nameOrSignatureOrTopic:
+      | "AuthorizationRequested"
       | "OwnershipTransferred"
       | "ValuationSubmitted"
       | "ValuationUpdated"
@@ -105,7 +112,15 @@ export interface PropertyValuationInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "checkAuthorizationStatus",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "confirmValuationUpdate",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "debugConfirmValuation",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
@@ -121,12 +136,24 @@ export interface PropertyValuationInterface extends Interface {
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
+    functionFragment: "getValuationStatus",
+    values: [BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "hasUserVoted",
+    values: [BigNumberish, AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "hasUserVotedOnPending",
     values: [BigNumberish, AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "historicalValues",
     values: [BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "isAuthorizedToUpdate",
+    values?: undefined
   ): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
   encodeFunctionData(
@@ -143,6 +170,10 @@ export interface PropertyValuationInterface extends Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "renounceOwnership",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "requestAuthorization",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -180,7 +211,15 @@ export interface PropertyValuationInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "checkAuthorizationStatus",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "confirmValuationUpdate",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "debugConfirmValuation",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -196,11 +235,23 @@ export interface PropertyValuationInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "getValuationStatus",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "hasUserVoted",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "hasUserVotedOnPending",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "historicalValues",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "isAuthorizedToUpdate",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
@@ -221,6 +272,10 @@ export interface PropertyValuationInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "requestAuthorization",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "submitValuation",
     data: BytesLike
   ): Result;
@@ -233,6 +288,22 @@ export interface PropertyValuationInterface extends Interface {
     functionFragment: "voteOnValuation",
     data: BytesLike
   ): Result;
+}
+
+export namespace AuthorizationRequestedEvent {
+  export type InputTuple = [
+    valuationContract: AddressLike,
+    nftContract: AddressLike
+  ];
+  export type OutputTuple = [valuationContract: string, nftContract: string];
+  export interface OutputObject {
+    valuationContract: string;
+    nftContract: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
 
 export namespace OwnershipTransferredEvent {
@@ -370,10 +441,35 @@ export interface PropertyValuation extends BaseContract {
 
   VERIFICATION_THRESHOLD: TypedContractMethod<[], [bigint], "view">;
 
+  checkAuthorizationStatus: TypedContractMethod<
+    [],
+    [
+      [boolean, string, string] & {
+        authorized: boolean;
+        nftContract: string;
+        thisContract: string;
+      }
+    ],
+    "view"
+  >;
+
   confirmValuationUpdate: TypedContractMethod<
     [_tokenId: BigNumberish],
     [void],
     "nonpayable"
+  >;
+
+  debugConfirmValuation: TypedContractMethod<
+    [_tokenId: BigNumberish],
+    [
+      [boolean, boolean, boolean, boolean] & {
+        propertyExists: boolean;
+        isOwner: boolean;
+        valuationVerified: boolean;
+        contractAuthorized: boolean;
+      }
+    ],
+    "view"
   >;
 
   getHistoricalValues: TypedContractMethod<
@@ -420,7 +516,26 @@ export interface PropertyValuation extends BaseContract {
     "view"
   >;
 
+  getValuationStatus: TypedContractMethod<
+    [_tokenId: BigNumberish],
+    [
+      [boolean, boolean, boolean, boolean] & {
+        hasVerified: boolean;
+        hasPending: boolean;
+        pendingIsVerified: boolean;
+        canConfirm: boolean;
+      }
+    ],
+    "view"
+  >;
+
   hasUserVoted: TypedContractMethod<
+    [_tokenId: BigNumberish, _user: AddressLike],
+    [boolean],
+    "view"
+  >;
+
+  hasUserVotedOnPending: TypedContractMethod<
     [_tokenId: BigNumberish, _user: AddressLike],
     [boolean],
     "view"
@@ -431,6 +546,8 @@ export interface PropertyValuation extends BaseContract {
     [bigint],
     "view"
   >;
+
+  isAuthorizedToUpdate: TypedContractMethod<[], [boolean], "view">;
 
   owner: TypedContractMethod<[], [string], "view">;
 
@@ -475,6 +592,8 @@ export interface PropertyValuation extends BaseContract {
   propertyNFT: TypedContractMethod<[], [string], "view">;
 
   renounceOwnership: TypedContractMethod<[], [void], "nonpayable">;
+
+  requestAuthorization: TypedContractMethod<[], [void], "nonpayable">;
 
   submitValuation: TypedContractMethod<
     [
@@ -546,8 +665,35 @@ export interface PropertyValuation extends BaseContract {
     nameOrSignature: "VERIFICATION_THRESHOLD"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
+    nameOrSignature: "checkAuthorizationStatus"
+  ): TypedContractMethod<
+    [],
+    [
+      [boolean, string, string] & {
+        authorized: boolean;
+        nftContract: string;
+        thisContract: string;
+      }
+    ],
+    "view"
+  >;
+  getFunction(
     nameOrSignature: "confirmValuationUpdate"
   ): TypedContractMethod<[_tokenId: BigNumberish], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "debugConfirmValuation"
+  ): TypedContractMethod<
+    [_tokenId: BigNumberish],
+    [
+      [boolean, boolean, boolean, boolean] & {
+        propertyExists: boolean;
+        isOwner: boolean;
+        valuationVerified: boolean;
+        contractAuthorized: boolean;
+      }
+    ],
+    "view"
+  >;
   getFunction(
     nameOrSignature: "getHistoricalValues"
   ): TypedContractMethod<[_tokenId: BigNumberish], [bigint[]], "view">;
@@ -592,7 +738,28 @@ export interface PropertyValuation extends BaseContract {
     "view"
   >;
   getFunction(
+    nameOrSignature: "getValuationStatus"
+  ): TypedContractMethod<
+    [_tokenId: BigNumberish],
+    [
+      [boolean, boolean, boolean, boolean] & {
+        hasVerified: boolean;
+        hasPending: boolean;
+        pendingIsVerified: boolean;
+        canConfirm: boolean;
+      }
+    ],
+    "view"
+  >;
+  getFunction(
     nameOrSignature: "hasUserVoted"
+  ): TypedContractMethod<
+    [_tokenId: BigNumberish, _user: AddressLike],
+    [boolean],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "hasUserVotedOnPending"
   ): TypedContractMethod<
     [_tokenId: BigNumberish, _user: AddressLike],
     [boolean],
@@ -605,6 +772,9 @@ export interface PropertyValuation extends BaseContract {
     [bigint],
     "view"
   >;
+  getFunction(
+    nameOrSignature: "isAuthorizedToUpdate"
+  ): TypedContractMethod<[], [boolean], "view">;
   getFunction(
     nameOrSignature: "owner"
   ): TypedContractMethod<[], [string], "view">;
@@ -653,6 +823,9 @@ export interface PropertyValuation extends BaseContract {
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
     nameOrSignature: "renounceOwnership"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "requestAuthorization"
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "submitValuation"
@@ -715,6 +888,13 @@ export interface PropertyValuation extends BaseContract {
   >;
 
   getEvent(
+    key: "AuthorizationRequested"
+  ): TypedContractEvent<
+    AuthorizationRequestedEvent.InputTuple,
+    AuthorizationRequestedEvent.OutputTuple,
+    AuthorizationRequestedEvent.OutputObject
+  >;
+  getEvent(
     key: "OwnershipTransferred"
   ): TypedContractEvent<
     OwnershipTransferredEvent.InputTuple,
@@ -751,6 +931,17 @@ export interface PropertyValuation extends BaseContract {
   >;
 
   filters: {
+    "AuthorizationRequested(address,address)": TypedContractEvent<
+      AuthorizationRequestedEvent.InputTuple,
+      AuthorizationRequestedEvent.OutputTuple,
+      AuthorizationRequestedEvent.OutputObject
+    >;
+    AuthorizationRequested: TypedContractEvent<
+      AuthorizationRequestedEvent.InputTuple,
+      AuthorizationRequestedEvent.OutputTuple,
+      AuthorizationRequestedEvent.OutputObject
+    >;
+
     "OwnershipTransferred(address,address)": TypedContractEvent<
       OwnershipTransferredEvent.InputTuple,
       OwnershipTransferredEvent.OutputTuple,

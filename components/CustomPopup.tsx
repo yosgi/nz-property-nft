@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react"
 import { LoadScript, GoogleMap, StreetViewPanorama, Libraries } from '@react-google-maps/api';
+import { useGoogleMaps } from "./GoogleMapsProvider";
 interface PopupProps {
     position: { x: number; y: number };
     content: string;
@@ -19,10 +20,15 @@ function CustomPopup({ position, content, onClose, streetViewPosition }: PopupPr
     const [panorama, setPanorama] = useState<google.maps.StreetViewPanorama | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isApiLoaded, setIsApiLoaded] = useState(false);
+    const { isLoaded } = useGoogleMaps();
   
     const initializeStreetView = useCallback(() => {
-      if (streetViewPosition && streetViewRef.current && isApiLoaded) {
+      if (!isLoaded || !window.google?.maps) {
+        setError('Google Maps not loaded');
+        setIsLoading(false);
+        return;
+      }
+      if (streetViewPosition && streetViewRef.current ) {
         setIsLoading(true);
         setError(null);
         
@@ -62,7 +68,7 @@ function CustomPopup({ position, content, onClose, streetViewPosition }: PopupPr
           setIsLoading(false);
         }
       }
-    }, [streetViewPosition, isApiLoaded]);
+    }, [streetViewPosition, isLoaded]);
   
     useEffect(() => {
       initializeStreetView();
@@ -87,11 +93,11 @@ function CustomPopup({ position, content, onClose, streetViewPosition }: PopupPr
     };
   
     return (
-      <LoadScript
-        googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string}
-        libraries={GOOGLE_MAPS_LIBRARIES}
-        onLoad={() => setIsApiLoaded(true)}
-      >
+      // <LoadScript
+      //   googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string}
+      //   libraries={GOOGLE_MAPS_LIBRARIES}
+      //   onLoad={() => setIsApiLoaded(true)}
+      // >
         <div
           style={{
             position: 'absolute',
@@ -186,7 +192,7 @@ function CustomPopup({ position, content, onClose, streetViewPosition }: PopupPr
             ×
           </button>
         </div>
-      </LoadScript>
+      // </LoadScript>
     );
   }
 

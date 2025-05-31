@@ -1,15 +1,18 @@
-import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import Navbar from "@/components/navbar"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Analytics } from "@vercel/analytics/next"
+import { ContractProvider } from "./contexts/ContractProvider"
+import { Toaster } from "sonner"
+import { GoogleMapsProvider } from "@/components/GoogleMapsProvider" 
+
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "Property NFT Platform",
-  description: "A platform for property NFTs with valuation and verification",
+  description: "A decentralized platform for property NFTs and valuations",
   generator: 'v0.dev'
 }
 
@@ -19,11 +22,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="stylesheet" href="/static/cesium/Widgets/widgets.css" />
       </head>
+     
       <body className={inter.className}>
         <Analytics />
         <ThemeProvider
@@ -32,12 +35,17 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="min-h-screen flex flex-col">
-            <Navbar />
-            <main className="flex-1 container mx-auto px-4 py-8">
-              {children}
-            </main>
-          </div>
+          <ContractProvider>
+            <GoogleMapsProvider> {/* Add this wrapper */}
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <main className="flex-1 container mx-auto px-4 py-8">
+                  {children}
+                </main>
+              </div>
+              <Toaster position="top-right" />
+            </GoogleMapsProvider>
+          </ContractProvider>
         </ThemeProvider>
       </body>
     </html>
