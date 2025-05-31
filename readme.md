@@ -397,3 +397,25 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Cesium for 3D mapping capabilities
 - IPFS for decentralized storage
 - Next.js team for the amazing framework
+
+## Currency Units
+
+The platform uses New Zealand Dollar (NZD) as the primary currency for all property valuations and transactions. Here's how currency is handled throughout the platform:
+
+### Valuation System
+- All property valuations are stored and displayed in NZD
+- Values are stored on-chain in Wei (1 NZD = 1e18 Wei)
+- The frontend automatically converts Wei to NZD for display
+- No ETH conversion is performed - values are stored directly in NZD
+
+### Display Format
+- Currency values are formatted using the NZD locale
+- Example: "NZD 1,234,567.89"
+- All monetary values in the UI are shown in NZD
+- No ETH or other cryptocurrency conversions are displayed
+
+### Important Notes
+- When submitting valuations, enter amounts in NZD
+- The system will automatically convert NZD to Wei for blockchain storage
+- Historical valuations are stored and displayed in NZD
+- Comparable property values are also in NZD
