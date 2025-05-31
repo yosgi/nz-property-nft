@@ -377,7 +377,6 @@ export default function ValuationPage() {
       // Refresh data
       await fetchValuationData()
     } catch (err) {
-      console.error("Error updating valuation:", err)
       const errorMsg = err instanceof Error ? err.message : "Failed to update valuation"
       setError(errorMsg)
       toast.error(errorMsg)

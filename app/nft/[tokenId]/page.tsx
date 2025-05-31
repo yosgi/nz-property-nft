@@ -751,9 +751,9 @@ export default function NFTDetailPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Estimated Value (ETH)</div>
+                      <div className="text-sm text-gray-500">Estimated Value</div>
                       <div className="font-semibold">
-                        {ethers.formatEther(property.estimatedValue.toString())} ETH
+                        {formatCurrency(weiToNZD(property.estimatedValue))}
                       </div>
                     </div>
                   </CardContent>

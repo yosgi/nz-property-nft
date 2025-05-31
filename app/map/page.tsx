@@ -338,7 +338,8 @@ export default function MapPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0 pt-6">
-          {isClient && (
+        <CesiumMap properties={filteredProperties} />
+          {/* {isClient && (
             isLoading ? (
               <div className="w-full h-[600px] flex items-center justify-center bg-muted">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -347,7 +348,7 @@ export default function MapPage() {
             ) : (
               <CesiumMap properties={filteredProperties} />
             )
-          )}
+          )} */}
         </CardContent>
       </Card>
 

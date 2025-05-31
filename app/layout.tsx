@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Analytics } from "@vercel/analytics/next"
 import { ContractProvider } from "./contexts/ContractProvider"
 import { Toaster } from "sonner"
+import { GoogleMapsProvider } from "@/components/GoogleMapsProvider" 
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -25,6 +26,7 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="/static/cesium/Widgets/widgets.css" />
       </head>
+     
       <body className={inter.className}>
         <Analytics />
         <ThemeProvider
@@ -34,13 +36,15 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <ContractProvider>
-            <div className="min-h-screen flex flex-col">
-              <Navbar />
-              <main className="flex-1 container mx-auto px-4 py-8">
-                {children}
-              </main>
-            </div>
-            <Toaster position="top-right" />
+            <GoogleMapsProvider> {/* Add this wrapper */}
+              <div className="min-h-screen flex flex-col">
+                <Navbar />
+                <main className="flex-1 container mx-auto px-4 py-8">
+                  {children}
+                </main>
+              </div>
+              <Toaster position="top-right" />
+            </GoogleMapsProvider>
           </ContractProvider>
         </ThemeProvider>
       </body>

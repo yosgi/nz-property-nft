@@ -282,7 +282,6 @@ export function ContractProvider({ children }: { children: ReactNode }) {
       while (hasMore) {
         try {
           const propertyData = await propertyNFT!.properties(index)
-          console.log("propertyData",propertyData)
           if (!propertyData[0] || propertyData[0] === "") {
             hasMore = false
             continue

@@ -46,6 +46,21 @@ type Property = {
   pendingRenovationScore: number
 }
 
+// Format currency in NZD
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat("en-NZ", {
+    style: "currency",
+    currency: "NZD",
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+// Convert Wei to NZD (assuming 1 ETH = 500,000 NZD for demo)
+const weiToNZD = (wei: bigint) => {
+  const ethValue = Number(ethers.formatEther(wei))
+  return ethValue * 500000
+}
+
 function PropertyCard({ property }: { property: Property }) {
   const { submitVote, submitValuationVote, transactionPending, votingProperty } = useContract()
   const router = useRouter()
@@ -187,7 +202,7 @@ function PropertyCard({ property }: { property: Property }) {
               {/* Current/Verified Value */}
               <p className="text-sm font-semibold">
                 {property.estimatedValue > 0 
-                  ? `${ethers.formatEther(property.estimatedValue.toString())} ETH`
+                  ? formatCurrency(weiToNZD(property.estimatedValue))
                   : "Not valued"
                 }
               </p>
@@ -209,10 +224,10 @@ function PropertyCard({ property }: { property: Property }) {
                   </div>
                   <div className="text-blue-700">
                     {property.pendingEstimatedValue > 0 && (
-                      <p><strong>Est. Value:</strong> {ethers.formatEther(property.pendingEstimatedValue.toString())} ETH</p>
+                      <p><strong>Est. Value:</strong> {formatCurrency(weiToNZD(property.pendingEstimatedValue))}</p>
                     )}
                     {property.pendingComparableValue > 0 && (
-                      <p><strong>Comparable:</strong> {ethers.formatEther(property.pendingComparableValue.toString())} ETH</p>
+                      <p><strong>Comparable:</strong> {formatCurrency(weiToNZD(property.pendingComparableValue))}</p>
                     )}
                   </div>
                   {/* Valuation Scores */}
