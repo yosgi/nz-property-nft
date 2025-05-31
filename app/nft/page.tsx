@@ -371,11 +371,15 @@ export default function NFTListPage() {
   const [allProperties, setAllProperties] = useState<Property[]>([])
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([])
   const [activeTab, setActiveTab] = useState("pending-verification")
+  const [isLoading, setIsLoading] = useState(false)
   const { getPropertiesWithPagination, isReady, transactionPending, connect, propertyValuation, address } = useContract()
 
   // Fetch all properties
   useEffect(() => {
     const fetchProperties = async () => {
+      if (!isReady || !propertyValuation || !address) return
+      
+      setIsLoading(true)
       try {
         const result = await getPropertiesWithPagination({
           page: 1,
@@ -426,7 +430,6 @@ export default function NFTListPage() {
               
               try {
                 const pendingValuation = await propertyValuation.getPendingValuation(Number(property.tokenId))
-                console.log(`Pending valuation for token ${property.tokenId}:`, pendingValuation)
                 
                 // Check if pending valuation exists - look for any non-zero value
                 hasPendingValuation = pendingValuation && (
@@ -451,27 +454,8 @@ export default function NFTListPage() {
                   pendingConditionScore = Number(pendingValuation.conditionScore) || 0
                   pendingAgeScore = Number(pendingValuation.ageScore) || 0
                   pendingRenovationScore = Number(pendingValuation.renovationScore) || 0
-                  
-                  console.log(`Property ${property.tokenId} has pending valuation:`, {
-                    estimatedValue: pendingEstimatedValue.toString(),
-                    comparableValue: pendingComparableValue.toString(),
-                    isVerified: pendingValuationVerified,
-                    scores: {
-                      location: pendingLocationScore,
-                      size: pendingSizeScore,
-                      condition: pendingConditionScore,
-                      age: pendingAgeScore,
-                      renovation: pendingRenovationScore
-                    }
-                  })
                 }
-                
-                // // Check if current user has voted on this pending valuation
-                // if (address && hasPendingValuation) {
-                //   hasVotedOnValuation = await propertyValuation.hasUserVotedOnPending(Number(property.tokenId), address)
-                // }
               } catch (error) {
-                console.error(`Error getting pending valuation for token ${property.tokenId}:`, error)
                 // Property might not have pending valuation
                 hasPendingValuation = false
                 pendingValuationVerified = false
@@ -496,7 +480,6 @@ export default function NFTListPage() {
                 pendingRenovationScore
               }
             } catch (error) {
-              console.error(`Error getting valuation status for property ${property.tokenId}:`, error)
               // Return property with default valuation status
               return {
                 ...property,
@@ -522,14 +505,13 @@ export default function NFTListPage() {
         
         setAllProperties(propertiesWithValuation as Property[])
       } catch (error) {
-        console.error("Error fetching properties:", error)
         setError("Failed to fetch properties")
+      } finally {
+        setIsLoading(false)
       }
     }
 
-    if (isReady && propertyValuation && address) {
-      fetchProperties()
-    }
+    fetchProperties()
   }, [isReady, getPropertiesWithPagination, propertyValuation, address])
 
   // Filter properties based on active tab
@@ -667,12 +649,12 @@ export default function NFTListPage() {
 
         <div className="relative mt-6">
           {/* Loading Overlay */}
-          {transactionPending && (
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          {(isLoading || transactionPending) && (
+            <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
               <div className="flex flex-col items-center gap-2">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
                 <p className="text-sm text-gray-600">
-                  Processing transaction...
+                  {isLoading ? "Loading properties..." : "Processing transaction..."}
                 </p>
               </div>
             </div>
@@ -686,7 +668,7 @@ export default function NFTListPage() {
                   <PropertyCard key={property.tokenId.toString()} property={property} />
                 ))}
               </div>
-              {filteredProperties.length === 0 && (
+              {filteredProperties.length === 0 && !isLoading && (
                 <div className="text-center py-12">
                   <h2 className="text-xl font-semibold text-gray-600">
                     No properties found in this category
