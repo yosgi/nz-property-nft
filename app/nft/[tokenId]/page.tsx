@@ -100,7 +100,7 @@ interface TransferDetails {
   ensName?: string
 }
 
-// Format currency in NZD
+// Format currency
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("en-NZ", {
     style: "currency",
@@ -597,8 +597,8 @@ export default function NFTDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-green-600 mb-2">
-                  {formatCurrency(currentValue)}
+                <div className="text-3xl font-bold">
+                  {formatCurrency(Number(property.estimatedValue) / 1e18)}
                 </div>
                 {valuationData && (
                   <div className="text-sm text-gray-500">
@@ -637,14 +637,14 @@ export default function NFTDetailPage() {
                 <div className="grid grid-cols-2 gap-4 mb-4">
                   <div>
                     <div className="text-sm text-blue-700">New Estimated Value</div>
-                    <div className="text-2xl font-bold text-blue-800">
-                      {formatCurrency(weiToNZD(pendingValuation.estimatedValue))}
+                    <div className="text-lg font-bold text-blue-800">
+                      {formatCurrency(Number(pendingValuation.estimatedValue) / 1e18)}
                     </div>
                   </div>
                   <div>
                     <div className="text-sm text-blue-700">Comparable Value</div>
-                    <div className="text-2xl font-bold text-blue-800">
-                      {formatCurrency(weiToNZD(pendingValuation.comparableValue))}
+                    <div className="text-lg font-bold text-blue-800">
+                      {formatCurrency(Number(pendingValuation.comparableValue) / 1e18)}
                     </div>
                   </div>
                 </div>
@@ -753,7 +753,7 @@ export default function NFTDetailPage() {
                     <div>
                       <div className="text-sm text-gray-500">Estimated Value</div>
                       <div className="font-semibold">
-                        {formatCurrency(weiToNZD(property.estimatedValue))}
+                        {formatCurrency(Number(property.estimatedValue) / 1e18)}
                       </div>
                     </div>
                   </CardContent>
@@ -861,14 +861,14 @@ export default function NFTDetailPage() {
                       <div className="text-center p-4 bg-gray-50 rounded-lg">
                         <div className="text-sm text-gray-500">Current Value</div>
                         <div className="text-xl font-bold text-gray-900">
-                          {formatCurrency(currentValue)}
+                          {formatCurrency(Number(property.estimatedValue) / 1e18)}
                         </div>
                       </div>
                       {pendingValuation && (
                         <div className="text-center p-4 bg-blue-50 rounded-lg">
                           <div className="text-sm text-blue-600">Pending Value</div>
                           <div className="text-xl font-bold text-blue-800">
-                            {formatCurrency(weiToNZD(pendingValuation.estimatedValue))}
+                            {formatCurrency(Number(pendingValuation.estimatedValue) / 1e18)}
                           </div>
                         </div>
                       )}
@@ -876,7 +876,7 @@ export default function NFTDetailPage() {
                         <div className="text-center p-4 bg-green-50 rounded-lg">
                           <div className="text-sm text-green-600">Comparable Value</div>
                           <div className="text-xl font-bold text-green-800">
-                            {formatCurrency(weiToNZD(valuationData.comparableValue))}
+                            {formatCurrency(Number(valuationData.comparableValue) / 1e18)}
                           </div>
                         </div>
                       )}

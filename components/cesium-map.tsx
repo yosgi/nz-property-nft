@@ -115,9 +115,13 @@ const findPropertyAtLocation = (properties: Property[], lat: number, lng: number
   );
 };
 
-const formatPropertyValue = (value: number): string => {
-  return value.toLocaleString();
-};
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat("en-NZ", {
+    style: "currency",
+    currency: "NZD",
+    maximumFractionDigits: 0,
+  }).format(value)
+}
 
 export default function CesiumMap({ properties }: { properties: Property[] }) {
   const cesiumContainerRef = useRef<HTMLDivElement>(null);
@@ -225,6 +229,7 @@ export default function CesiumMap({ properties }: { properties: Property[] }) {
           ${buildingDescription ? `<p style="margin: 5px 0;"><strong>Description:</strong> ${buildingDescription}</p>` : ''}
           ${buildingWikidata ? `<p style="margin: 5px 0;"><strong>Wikidata:</strong> <a href="https://www.wikidata.org/wiki/${buildingWikidata}" target="_blank" style="color: #2196F3; text-decoration: none;">${buildingWikidata}</a></p>` : ''}
           ${buildingRef ? `<p style="margin: 5px 0;"><strong>Reference:</strong> <a href="${buildingRef}" target="_blank" style="color: #2196F3; text-decoration: none;">Website</a></p>` : ''}
+          ${existingProperty?.estimatedValue ? `<p style="margin: 5px 0;"><strong>Estimated Value:</strong> ${formatCurrency(Number(existingProperty.estimatedValue) / 1e18)}</p>` : ''}
         </div>
         <button 
           onclick="window.location.href='${buttonLink}'"

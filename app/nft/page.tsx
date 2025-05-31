@@ -46,7 +46,7 @@ type Property = {
   pendingRenovationScore: number
 }
 
-// Format currency in NZD
+// Format currency
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("en-NZ", {
     style: "currency",
@@ -200,12 +200,9 @@ function PropertyCard({ property }: { property: Property }) {
             <h3 className="text-sm font-medium text-gray-500">Estimated Value</h3>
             <div className="space-y-1">
               {/* Current/Verified Value */}
-              <p className="text-sm font-semibold">
-                {property.estimatedValue > 0 
-                  ? formatCurrency(weiToNZD(property.estimatedValue))
-                  : "Not valued"
-                }
-              </p>
+              <div className="text-2xl font-bold">
+                {formatCurrency(Number(property.estimatedValue) / 1e18)}
+              </div>
               {/* Pending Value */}
               {property.hasPendingValuation && (
                 property.pendingEstimatedValue > 0 || 
@@ -224,10 +221,10 @@ function PropertyCard({ property }: { property: Property }) {
                   </div>
                   <div className="text-blue-700">
                     {property.pendingEstimatedValue > 0 && (
-                      <p><strong>Est. Value:</strong> {formatCurrency(weiToNZD(property.pendingEstimatedValue))}</p>
+                      <p><strong>Est. Value:</strong> {formatCurrency(Number(property.pendingEstimatedValue) / 1e18)}</p>
                     )}
                     {property.pendingComparableValue > 0 && (
-                      <p><strong>Comparable:</strong> {formatCurrency(weiToNZD(property.pendingComparableValue))}</p>
+                      <p><strong>Comparable:</strong> {formatCurrency(Number(property.pendingComparableValue) / 1e18)}</p>
                     )}
                   </div>
                   {/* Valuation Scores */}

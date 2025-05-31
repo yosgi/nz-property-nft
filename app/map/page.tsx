@@ -38,6 +38,15 @@ interface MapProperty {
   rejectionVotes: number;
 }
 
+// Format currency
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat("en-NZ", {
+    style: "currency",
+    currency: "NZD",
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
 export default function MapPage() {
   const [isClient, setIsClient] = useState(false)
   const [properties, setProperties] = useState<MapProperty[]>([])
@@ -187,7 +196,8 @@ export default function MapPage() {
   const verifiedCount = properties.filter(p => p.isVerified).length
   const totalValue = properties.reduce((sum, p) => sum + (p.estimatedValue || 0), 0)
   const averageValue = properties.length > 0 ? totalValue / properties.length : 0
-
+  console.log(properties)
+  console.log(totalValue)
   // Handle filter clearing
   const clearFilters = () => {
     setPropertyTypeFilter("")
@@ -392,10 +402,10 @@ export default function MapPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {isLoading ? "..." : `${(totalValue / 1000000).toFixed(1)}M`}
+              {isLoading ? "..." : formatCurrency(totalValue / 1e18)}
             </div>
             <p className="text-sm text-muted-foreground">
-              Avg: ${averageValue > 0 ? (averageValue / 1000).toFixed(0) : "0"}K per property
+              Avg: {averageValue > 0 ? formatCurrency(averageValue / 1e18) : "NZD 0"} per property
             </p>
           </CardContent>
         </Card>

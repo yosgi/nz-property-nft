@@ -239,7 +239,7 @@ export default function ValuationPage() {
         .filter(p => p.estimatedValue > 0)
         .map(p => ({
           address: p.propertyAddress,
-          estimatedValue: Number(p.estimatedValue) / 1e18 * 500000 // Convert from Wei to NZD
+          estimatedValue: Number(p.estimatedValue) / 1e18 // Convert from Wei to NZD
         }))
         .filter(p => p.estimatedValue > 50000 && p.estimatedValue < 5000000) // Reasonable range
 
@@ -249,7 +249,7 @@ export default function ValuationPage() {
         : 0
 
       // Convert property estimated value from Wei to NZD
-      const propertyValueNZD = Number(property.estimatedValue) / 1e18 * 500000
+      const propertyValueNZD = Number(property.estimatedValue) / 1e18
 
       // Generate historical values
       const historicalValues = generateHistoricalValues(propertyValueNZD)
@@ -282,8 +282,8 @@ export default function ValuationPage() {
           
           pendingValuation = {
             isVerified: pendingVal.isVerified,
-            value: Number(pendingVal.estimatedValue) / 1e18 * 500000, // Convert to NZD
-            comparableValue: Number(pendingVal.comparableValue) / 1e18 * 500000,
+            value: Number(pendingVal.estimatedValue) / 1e18, // Convert to NZD
+            comparableValue: Number(pendingVal.comparableValue) / 1e18,
             votes: Number(pendingVal.verificationVotes),
             rejections: Number(pendingVal.rejectionVotes),
             canConfirm: canConfirm,
@@ -359,9 +359,8 @@ export default function ValuationPage() {
         return
       }
 
-      // Convert NZD to Wei (divide by 500000 to get ETH equivalent, then convert to Wei)
-      const ethValue = Number(newValuation) / 500000
-      const valuationInWei = Math.floor(ethValue * 1e18)
+      // Convert NZD to Wei (1 NZD = 1e18 Wei)
+      const valuationInWei = Math.floor(Number(newValuation) * 1e18)
       
       await submitValuation({
         tokenId: Number(selectedPropertyId),
