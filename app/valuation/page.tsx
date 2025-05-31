@@ -44,6 +44,7 @@ interface ValuationData {
   historicalValues: HistoricalValue[]
   comparableProperties: ComparableProperty[]
   owner: string
+  isVerified: boolean
   pendingValuation?: {
     isVerified: boolean
     value: number
@@ -273,7 +274,6 @@ export default function ValuationPage() {
       let pendingValuation = undefined
       try {
         const pendingVal = await propertyValuation.getPendingValuation(Number(selectedPropertyId))
-        console.log("Pending valuation data:", pendingVal)
         
         if (pendingVal && Number(pendingVal.estimatedValue) > 0) {
           // Check if user can confirm (owner + verified)
@@ -311,6 +311,7 @@ export default function ValuationPage() {
         historicalValues,
         comparableProperties,
         owner: property.currentOwner,
+        isVerified: property.isVerified,
         pendingValuation
       })
 
@@ -352,6 +353,12 @@ export default function ValuationPage() {
     if (!newValuation || !isReady || !valuationData) return
 
     try {
+      // Check if property is verified
+      if (!valuationData.isVerified) {
+        toast.error("Only verified properties can be updated")
+        return
+      }
+
       // Convert NZD to Wei (divide by 500000 to get ETH equivalent, then convert to Wei)
       const ethValue = Number(newValuation) / 500000
       const valuationInWei = Math.floor(ethValue * 1e18)
@@ -373,9 +380,6 @@ export default function ValuationPage() {
       setUpdateReason("")
       setRenovationDetails("")
       setRenovationDate("")
-      
-      // Refresh data
-      await fetchValuationData()
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to update valuation"
       setError(errorMsg)
