@@ -204,7 +204,6 @@ export function ContractProvider({ children }: { children: ReactNode }) {
         longitudeBigInt,
       )
       await tx.wait()
-      toast.success("Property submitted successfully")
       
       // Refresh properties after submission
       await getPropertiesWithPagination({ page: 1, limit: 12 })
